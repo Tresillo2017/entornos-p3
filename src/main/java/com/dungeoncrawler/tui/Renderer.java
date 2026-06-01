@@ -11,36 +11,46 @@ import java.util.ArrayList;
 import java.util.List;
 
 /**
- * Renders the game state as an ASCII TUI using JLine3's Display for diff-based
- * updates: only lines that changed are rewritten on each frame.
+ * Renders all game screens using JLine3 Display (diff-based updates).
+ * Layout adapts to terminal size; banners animate per tick.
  */
 public class Renderer {
 
-    // ── Map dimensions ────────────────────────────────────────────────────────
-    private static final int MAP_SIZE = 21; // 0..20 inclusive
+    private static final int MAP_SIZE    = 21;
+    private static final int FALLBACK_W  = 120;
+    private static final int FALLBACK_H  = 40;
 
     // ── Sprites ───────────────────────────────────────────────────────────────
-    private static final String SPRITE_GOBLIN  = "g";
-    private static final String SPRITE_ORC     = "O";
-    private static final String SPRITE_SKEL    = "s";
-    private static final String SPRITE_ENEMY   = "E";
-    private static final String SPRITE_FLOOR   = "·";
+    private static final String SPRITE_GOBLIN = "g";
+    private static final String SPRITE_ORC    = "O";
+    private static final String SPRITE_SKEL   = "s";
+    private static final String SPRITE_ENEMY  = "E";
+    private static final String SPRITE_FLOOR  = "·";
+
+    // ── Colour cycle for title animation (yellow → cyan → magenta → white) ───
+    private static final int[] TITLE_COLOURS = {
+        AttributedStyle.YELLOW,
+        AttributedStyle.CYAN,
+        AttributedStyle.MAGENTA,
+        AttributedStyle.WHITE,
+        AttributedStyle.CYAN,
+        AttributedStyle.YELLOW,
+    };
 
     // ── Styles ────────────────────────────────────────────────────────────────
-    private static final AttributedStyle S_PLAYER  = AttributedStyle.DEFAULT.foreground(AttributedStyle.CYAN).bold();
-    private static final AttributedStyle S_GOBLIN  = AttributedStyle.DEFAULT.foreground(AttributedStyle.GREEN);
-    private static final AttributedStyle S_ORC     = AttributedStyle.DEFAULT.foreground(AttributedStyle.RED).bold();
-    private static final AttributedStyle S_SKEL    = AttributedStyle.DEFAULT.foreground(AttributedStyle.WHITE);
-    private static final AttributedStyle S_ENEMY   = AttributedStyle.DEFAULT.foreground(AttributedStyle.RED);
-    private static final AttributedStyle S_COIN    = AttributedStyle.DEFAULT.foreground(AttributedStyle.YELLOW).bold();
-    private static final AttributedStyle S_POTION  = AttributedStyle.DEFAULT.foreground(AttributedStyle.MAGENTA).bold();
-    private static final AttributedStyle S_FLOOR   = AttributedStyle.DEFAULT.foreground(8); // bright black
-    private static final AttributedStyle S_BORDER  = AttributedStyle.DEFAULT.foreground(AttributedStyle.WHITE).bold();
-    private static final AttributedStyle S_TITLE   = AttributedStyle.DEFAULT.foreground(AttributedStyle.YELLOW).bold();
-    private static final AttributedStyle S_LABEL   = AttributedStyle.DEFAULT.foreground(AttributedStyle.WHITE).bold();
-    private static final AttributedStyle S_VALUE   = AttributedStyle.DEFAULT.foreground(AttributedStyle.CYAN);
-    private static final AttributedStyle S_PAUSE   = AttributedStyle.DEFAULT.foreground(AttributedStyle.YELLOW).bold();
-    private static final AttributedStyle S_HINT    = AttributedStyle.DEFAULT.foreground(8);
+    private static final AttributedStyle S_PLAYER = AttributedStyle.DEFAULT.foreground(AttributedStyle.CYAN).bold();
+    private static final AttributedStyle S_GOBLIN = AttributedStyle.DEFAULT.foreground(AttributedStyle.GREEN);
+    private static final AttributedStyle S_ORC    = AttributedStyle.DEFAULT.foreground(AttributedStyle.RED).bold();
+    private static final AttributedStyle S_SKEL   = AttributedStyle.DEFAULT.foreground(AttributedStyle.WHITE);
+    private static final AttributedStyle S_ENEMY  = AttributedStyle.DEFAULT.foreground(AttributedStyle.RED);
+    private static final AttributedStyle S_COIN   = AttributedStyle.DEFAULT.foreground(AttributedStyle.YELLOW).bold();
+    private static final AttributedStyle S_POTION = AttributedStyle.DEFAULT.foreground(AttributedStyle.MAGENTA).bold();
+    private static final AttributedStyle S_FLOOR  = AttributedStyle.DEFAULT.foreground(8);
+    private static final AttributedStyle S_BORDER = AttributedStyle.DEFAULT.foreground(AttributedStyle.WHITE).bold();
+    private static final AttributedStyle S_LABEL  = AttributedStyle.DEFAULT.foreground(AttributedStyle.WHITE).bold();
+    private static final AttributedStyle S_VALUE  = AttributedStyle.DEFAULT.foreground(AttributedStyle.CYAN);
+    private static final AttributedStyle S_PAUSE  = AttributedStyle.DEFAULT.foreground(AttributedStyle.YELLOW).bold();
+    private static final AttributedStyle S_HINT   = AttributedStyle.DEFAULT.foreground(8);
 
     private final Terminal terminal;
     private final Display  display;
@@ -51,182 +61,192 @@ public class Renderer {
         this.display.reset();
     }
 
-    // ── Public render entry points ────────────────────────────────────────────
+    // ── Terminal size (with fallback) ─────────────────────────────────────────
 
-    public void renderMenu() {
+    private int cols() { int w = terminal.getWidth();  return w > 0 ? w : FALLBACK_W; }
+    private int rows() { int h = terminal.getHeight(); return h > 0 ? h : FALLBACK_H; }
+
+    // ── Menu ──────────────────────────────────────────────────────────────────
+
+    public void renderMenu(int tick) {
+        int w = cols();
         List<AttributedString> lines = new ArrayList<>();
-        for (String l : titleBannerLines()) lines.add(styled(S_TITLE, l));
+
         lines.add(AttributedString.EMPTY);
-        lines.add(centeredLine("┌─────────────────────────┐", 60));
-        lines.add(centeredLine("│     MENÚ PRINCIPAL      │", 60));
-        lines.add(centeredLine("├─────────────────────────┤", 60));
-        lines.add(centeredLine("│  [1]  Nueva Partida     │", 60));
-        lines.add(centeredLine("│  [2]  Salir             │", 60));
-        lines.add(centeredLine("└─────────────────────────┘", 60));
+        for (String l : TITLE_LINES) {
+            lines.add(animatedTitleLine(l, tick, w));
+        }
         lines.add(AttributedString.EMPTY);
-        lines.add(styled(S_HINT, "  W/A/S/D ó ↑←↓→  Mover  |  ESPACIO  Atacar  |  P  Pausa  |  Q  Menú"));
+
+        // Animated subtitle: blinking cursor
+        String sub = "~ DUNGEON CRAWLER 2D ~" + (tick % 2 == 0 ? "  " : " _");
+        lines.add(centered(styled(S_HINT, sub), w));
         lines.add(AttributedString.EMPTY);
+
+        // Menu box centered
+        String[] box = {
+            "┌─────────────────────────┐",
+            "│     MENÚ PRINCIPAL      │",
+            "├─────────────────────────┤",
+            "│  [1]  Nueva Partida     │",
+            "│  [2]  Salir             │",
+            "└─────────────────────────┘",
+        };
+        AttributedStyle boxStyle = AttributedStyle.DEFAULT
+                .foreground(TITLE_COLOURS[tick % TITLE_COLOURS.length]).bold();
+        for (String l : box) lines.add(centered(styled(boxStyle, l), w));
+
+        lines.add(AttributedString.EMPTY);
+        lines.add(centered(styled(S_HINT, "W/A/S/D · flechas: Mover  │  ESPACIO: Atacar  │  P: Pausa  │  Q: Salir"), w));
+
+        // Pad to fill terminal height
+        while (lines.size() < rows()) lines.add(AttributedString.EMPTY);
+
         push(lines);
     }
 
-    public void renderGame(MotorJuego motor, GameLog log, int animTick) {
+    // ── Game ──────────────────────────────────────────────────────────────────
+
+    public void renderGame(MotorJuego motor, GameLog log, int tick) {
+        int w = cols();
+
         Jugador       jugador = motor.getJugador();
         List<Enemigo> enems   = motor.getEnemigos();
         List<Item>    items   = motor.getItems();
 
-        // ── Build map grid ────────────────────────────────────────────────────
-        AttributedStyle[][] cellStyle  = new AttributedStyle[MAP_SIZE][MAP_SIZE];
-        String[][]          cellSprite = new String[MAP_SIZE][MAP_SIZE];
-
+        // Build map grid
+        AttributedStyle[][] cs = new AttributedStyle[MAP_SIZE][MAP_SIZE];
+        String[][]          ct = new String[MAP_SIZE][MAP_SIZE];
         for (int y = 0; y < MAP_SIZE; y++)
-            for (int x = 0; x < MAP_SIZE; x++) {
-                cellStyle[y][x]  = S_FLOOR;
-                cellSprite[y][x] = SPRITE_FLOOR;
-            }
+            for (int x = 0; x < MAP_SIZE; x++) { cs[y][x] = S_FLOOR; ct[y][x] = SPRITE_FLOOR; }
 
         for (Item item : items) {
             if (!item.estaVivo()) continue;
             int ix = clamp(item.getX()), iy = clamp(item.getY());
             if (item.getTipoItem() == Item.TipoItem.MONEDA) {
-                cellStyle[iy][ix]  = S_COIN;
-                cellSprite[iy][ix] = animCoin(animTick);
+                cs[iy][ix] = S_COIN; ct[iy][ix] = animCoin(tick);
             } else {
-                cellStyle[iy][ix]  = S_POTION;
-                cellSprite[iy][ix] = "+";
+                cs[iy][ix] = S_POTION; ct[iy][ix] = "+";
             }
         }
-
         for (Enemigo e : enems) {
             if (!e.estaVivo()) continue;
             int ex = clamp(e.getX()), ey = clamp(e.getY());
-            String name = e.getNombre().toLowerCase();
-            if (name.startsWith("goblin")) {
-                cellStyle[ey][ex]  = S_GOBLIN;
-                cellSprite[ey][ex] = animEnemy(SPRITE_GOBLIN, e.getEstadoIA(), animTick);
-            } else if (name.startsWith("orc")) {
-                cellStyle[ey][ex]  = S_ORC;
-                cellSprite[ey][ex] = animEnemy(SPRITE_ORC, e.getEstadoIA(), animTick);
-            } else if (name.startsWith("skeleton") || name.startsWith("skel")) {
-                cellStyle[ey][ex]  = S_SKEL;
-                cellSprite[ey][ex] = animEnemy(SPRITE_SKEL, e.getEstadoIA(), animTick);
-            } else {
-                cellStyle[ey][ex]  = S_ENEMY;
-                cellSprite[ey][ex] = SPRITE_ENEMY;
-            }
+            String nm = e.getNombre().toLowerCase();
+            if      (nm.startsWith("goblin"))              { cs[ey][ex] = S_GOBLIN; ct[ey][ex] = animEnemy(SPRITE_GOBLIN, e.getEstadoIA(), tick); }
+            else if (nm.startsWith("orc"))                 { cs[ey][ex] = S_ORC;    ct[ey][ex] = animEnemy(SPRITE_ORC,    e.getEstadoIA(), tick); }
+            else if (nm.startsWith("skel"))                { cs[ey][ex] = S_SKEL;   ct[ey][ex] = animEnemy(SPRITE_SKEL,   e.getEstadoIA(), tick); }
+            else                                           { cs[ey][ex] = S_ENEMY;  ct[ey][ex] = SPRITE_ENEMY; }
         }
-
         if (jugador != null && jugador.estaVivo()) {
             int px = clamp(jugador.getX()), py = clamp(jugador.getY());
-            cellStyle[py][px]  = S_PLAYER;
-            cellSprite[py][px] = animPlayer(animTick);
+            cs[py][px] = S_PLAYER; ct[py][px] = animPlayer(tick);
         }
 
-        // ── Assemble lines list ───────────────────────────────────────────────
+        // Map block width: "║ " + 21*(ch+" ") + "║" = 2 + 42 + 1 = 45
+        int mapW   = 2 + MAP_SIZE * 2 + 1;   // 45
+        int sideW  = Math.max(30, w - mapW - 3);
+
         List<AttributedString> lines = new ArrayList<>();
 
-        // Top border
-        lines.add(mapBorder("╔", "═", "╗"));
+        // Top border spans full width
+        lines.add(hline("╔", "═", "╗", w));
+        lines.add(titleBar(" DUNGEON CRAWLER 2D ", w));
+        lines.add(hline("╠", "═", "╣", w));
 
-        // Title
-        lines.add(mapTitleLine());
-
-        // Separator
-        lines.add(mapBorder("╠", "═", "╣"));
-
-        // Map rows + sidebar
         for (int y = 0; y < MAP_SIZE; y++) {
             AttributedStringBuilder ab = new AttributedStringBuilder();
             ab.style(S_BORDER).append("║ ");
             for (int x = 0; x < MAP_SIZE; x++) {
-                ab.style(cellStyle[y][x]).append(cellSprite[y][x]);
+                ab.style(cs[y][x]).append(ct[y][x]);
                 ab.style(S_FLOOR).append(" ");
             }
-            ab.style(S_BORDER).append("║  ");
-            ab.style(AttributedStyle.DEFAULT).append(sidebarLine(y, jugador, enems, motor, log));
+            ab.style(S_BORDER).append("║ ");
+            ab.style(AttributedStyle.DEFAULT).append(sidebarLine(y, jugador, enems, motor, log, sideW));
             lines.add(ab.toAttributedString());
         }
 
-        // Bottom border
-        lines.add(mapBorder("╚", "═", "╝"));
-
-        // Controls
+        lines.add(hline("╚", "═", "╝", w));
         lines.add(AttributedString.EMPTY);
-        lines.add(styled(S_HINT, "  W/A/S/D ó flechas: Mover  |  ESPACIO/F: Atacar  |  P: Pausa  |  Q: Menú"));
 
-        // Pause overlay appended as extra line
+        String hint = "  W/A/S/D · flechas: Mover  │  ESPACIO/F: Atacar  │  P: Pausa  │  Q: Menú";
+        lines.add(styled(S_HINT, hint));
+
         if (motor.getEstado() == MotorJuego.EstadoJuego.PAUSA) {
             lines.add(styled(S_PAUSE, "  ══ JUEGO PAUSADO ══  Pulsa P para reanudar"));
         } else {
             lines.add(AttributedString.EMPTY);
         }
 
+        while (lines.size() < rows()) lines.add(AttributedString.EMPTY);
         push(lines);
     }
 
-    public void renderVictory(MotorJuego motor) {
+    // ── Victory ───────────────────────────────────────────────────────────────
+
+    public void renderVictory(MotorJuego motor, int tick) {
+        int w = cols();
         List<AttributedString> lines = new ArrayList<>();
-        AttributedStyle gold = AttributedStyle.DEFAULT.foreground(AttributedStyle.YELLOW).bold();
-        for (String l : victoryBannerLines()) lines.add(styled(gold, l));
-        lines.addAll(endStatLines(motor));
         lines.add(AttributedString.EMPTY);
-        lines.add(styled(S_HINT, "  Pulsa cualquier tecla para volver al menú..."));
+        for (String l : VICTORY_LINES) lines.add(animatedTitleLine(l, tick, w));
+        lines.add(AttributedString.EMPTY);
+
+        // Sparkling stars animation around "¡VICTORIA!"
+        String stars = starRow(tick, 20);
+        lines.add(centered(styled(
+            AttributedStyle.DEFAULT.foreground(TITLE_COLOURS[tick % TITLE_COLOURS.length]).bold(),
+            stars + "  ¡ V I C T O R I A !  " + stars), w));
+        lines.add(AttributedString.EMPTY);
+
+        lines.addAll(endStatLines(motor, w));
+        lines.add(AttributedString.EMPTY);
+        lines.add(centered(styled(S_HINT, "[ Pulsa cualquier tecla para continuar ]"), w));
+        while (lines.size() < rows()) lines.add(AttributedString.EMPTY);
         push(lines);
     }
 
-    public void renderGameOver(MotorJuego motor) {
+    // ── Game Over ─────────────────────────────────────────────────────────────
+
+    public void renderGameOver(MotorJuego motor, int tick) {
+        int w = cols();
         List<AttributedString> lines = new ArrayList<>();
-        AttributedStyle red = AttributedStyle.DEFAULT.foreground(AttributedStyle.RED).bold();
-        for (String l : gameOverBannerLines()) lines.add(styled(red, l));
-        lines.addAll(endStatLines(motor));
         lines.add(AttributedString.EMPTY);
-        lines.add(styled(S_HINT, "  Pulsa cualquier tecla para volver al menú..."));
+        for (String l : GAMEOVER_LINES) lines.add(animatedGameOverLine(l, tick, w));
+        lines.add(AttributedString.EMPTY);
+
+        // Blinking skull
+        String skull = (tick % 2 == 0) ? "💀  Y O U   D I E D  💀" : "   Y O U   D I E D   ";
+        lines.add(centered(styled(
+            AttributedStyle.DEFAULT.foreground(AttributedStyle.RED).bold(), skull), w));
+        lines.add(AttributedString.EMPTY);
+
+        lines.addAll(endStatLines(motor, w));
+        lines.add(AttributedString.EMPTY);
+        lines.add(centered(styled(S_HINT, "[ Pulsa cualquier tecla para continuar ]"), w));
+        while (lines.size() < rows()) lines.add(AttributedString.EMPTY);
         push(lines);
     }
 
-    // ── Core display update ───────────────────────────────────────────────────
+    // ── Display push ──────────────────────────────────────────────────────────
 
-    /** Hands the full line list to Display; it diffs and only redraws changed lines. */
     private void push(List<AttributedString> lines) {
-        int cols = terminal.getWidth();
-        int rows = terminal.getHeight();
-        if (cols <= 0) cols = 120;
-        if (rows <= 0) rows = 40;
-        display.resize(rows, cols);
+        int c = cols(), r = rows();
+        display.resize(r, c);
         display.update(lines, -1);
     }
 
-    // ── Line builders ─────────────────────────────────────────────────────────
-
-    private AttributedString mapBorder(String l, String mid, String r) {
-        AttributedStringBuilder ab = new AttributedStringBuilder();
-        ab.style(S_BORDER).append(l);
-        int width = MAP_SIZE * 2 + 1; // each cell is "X " = 2 chars, plus leading space
-        for (int i = 0; i < width + 1; i++) ab.append(mid);
-        ab.append(r);
-        return ab.toAttributedString();
-    }
-
-    private AttributedString mapTitleLine() {
-        String title  = " DUNGEON CRAWLER 2D ";
-        int lineLen   = MAP_SIZE * 2 + 2;
-        int leftPad   = (lineLen - title.length()) / 2;
-        int rightPad  = lineLen - title.length() - leftPad;
-        AttributedStringBuilder ab = new AttributedStringBuilder();
-        ab.style(S_BORDER).append("║");
-        ab.style(S_TITLE).append(" ".repeat(leftPad)).append(title).append(" ".repeat(rightPad));
-        ab.style(S_BORDER).append("║");
-        return ab.toAttributedString();
-    }
+    // ── Sidebar ───────────────────────────────────────────────────────────────
 
     private String sidebarLine(int row, Jugador j, List<Enemigo> enems,
-                                MotorJuego motor, GameLog log) {
-        final int W = 38;
+                                MotorJuego motor, GameLog log, int sideW) {
+        int W = sideW;
         switch (row) {
-            case 0: return pad("╔══ ESTADÍSTICAS ═══════════════════╗", W);
+            case 0: return pad("╔══ ESTADÍSTICAS " + "═".repeat(Math.max(0, W - 18)) + "╗", W);
             case 1: return pad("║ " + (j != null ? j.getNombre() : "---") + "  " + stateTag(motor), W) + " ║";
             case 2: {
                 if (j == null) return pad("║ HP: ???", W) + " ║";
-                return pad("║ HP " + hpBar(j.getVida(), j.getVidaMaxima(), 18)
+                int barW = Math.max(5, W - 16);
+                return pad("║ HP " + hpBar(j.getVida(), j.getVidaMaxima(), barW)
                         + " " + j.getVida() + "/" + j.getVidaMaxima(), W) + " ║";
             }
             case 3: {
@@ -235,21 +255,22 @@ public class Renderer {
                         + "  LVL:" + j.getNivel()
                         + "  PTS:" + motor.getPuntuacion(), W) + " ║";
             }
-            case 4: return pad("╠══ ENEMIGOS ════════════════════════╣", W);
+            case 4: return pad("╠══ ENEMIGOS " + "═".repeat(Math.max(0, W - 13)) + "╣", W);
             case 5: case 6: case 7: {
                 int idx = row - 5;
                 if (idx < enems.size()) {
                     Enemigo e  = enems.get(idx);
-                    String nm  = e.getNombre().length() > 10 ? e.getNombre().substring(0, 10) : e.getNombre();
+                    int maxNm  = Math.max(4, W - 14);
+                    String nm  = e.getNombre().length() > maxNm ? e.getNombre().substring(0, maxNm) : e.getNombre();
                     return pad("║ " + iaTag(e.getEstadoIA()) + " " + nm + " " + e.getVida() + "hp", W) + " ║";
                 }
                 return pad("║", W) + " ║";
             }
-            case 8: return pad("╠══ LOG ══════════════════════════════╣", W);
+            case 8: return pad("╠══ LOG " + "═".repeat(Math.max(0, W - 8)) + "╣", W);
             default: {
-                List<String> msgs   = log.getMessages();
-                int visible         = MAP_SIZE - 9;
-                int offset          = msgs.size() - visible + (row - 9);
+                List<String> msgs = log.getMessages();
+                int visible       = MAP_SIZE - 9;
+                int offset        = msgs.size() - visible + (row - 9);
                 if (offset >= 0 && offset < msgs.size()) {
                     String msg = msgs.get(offset);
                     if (msg.length() > W - 3) msg = msg.substring(0, W - 3);
@@ -260,35 +281,71 @@ public class Renderer {
         }
     }
 
-    private List<AttributedString> endStatLines(MotorJuego motor) {
+    // ── End stats ─────────────────────────────────────────────────────────────
+
+    private List<AttributedString> endStatLines(MotorJuego motor, int w) {
         Jugador j = motor.getJugador();
         List<AttributedString> out = new ArrayList<>();
-        out.add(AttributedString.EMPTY);
-        out.add(statLine("Jugador",     j != null ? j.getNombre() : "?"));
+        out.add(centered(statLine("Jugador",     j != null ? j.getNombre() : "?"), w));
         if (j != null) {
-            out.add(statLine("Vida final",  j.getVida() + "/" + j.getVidaMaxima()));
-            out.add(statLine("Nivel",       String.valueOf(j.getNivel())));
-            out.add(statLine("Experiencia", String.valueOf(j.getExperiencia())));
+            out.add(centered(statLine("Vida final",  j.getVida() + "/" + j.getVidaMaxima()), w));
+            out.add(centered(statLine("Nivel",       String.valueOf(j.getNivel())), w));
+            out.add(centered(statLine("Experiencia", String.valueOf(j.getExperiencia())), w));
         }
-        out.add(statLine("Puntuación",  String.valueOf(motor.getPuntuacion())));
-        out.add(statLine("Turnos",      String.valueOf(motor.getTicks())));
-        out.add(statLine("Enemigos",    motor.getEnemigos().size() + " restantes"));
+        out.add(centered(statLine("Puntuación",  String.valueOf(motor.getPuntuacion())), w));
+        out.add(centered(statLine("Turnos",      String.valueOf(motor.getTicks())), w));
+        out.add(centered(statLine("Enemigos",    motor.getEnemigos().size() + " restantes"), w));
         if (motor.getSistemaLogros() != null
                 && !motor.getSistemaLogros().getLogrosDesbloqueados().isEmpty()) {
-            out.add(statLine("Logros", motor.getSistemaLogros().getLogrosDesbloqueados().toString()));
+            out.add(centered(statLine("Logros", motor.getSistemaLogros().getLogrosDesbloqueados().toString()), w));
         }
         return out;
     }
 
-    // ── Animation ─────────────────────────────────────────────────────────────
+    // ── Animation helpers ─────────────────────────────────────────────────────
 
-    private String animPlayer(int tick) {
-        return (tick % 4 < 2) ? "@" : "§";
+    /** Title line: each character cycles through colours offset by column position. */
+    private AttributedString animatedTitleLine(String text, int tick, int w) {
+        if (text.isBlank()) return AttributedString.EMPTY;
+        int pad = Math.max(0, (w - text.length()) / 2);
+        AttributedStringBuilder ab = new AttributedStringBuilder();
+        ab.append(" ".repeat(pad));
+        for (int i = 0; i < text.length(); i++) {
+            int colIdx = (tick + i) % TITLE_COLOURS.length;
+            ab.style(AttributedStyle.DEFAULT.foreground(TITLE_COLOURS[colIdx]).bold());
+            ab.append(text.charAt(i));
+        }
+        return ab.toAttributedString();
     }
 
+    /** Game over line: alternates between red+bold and dark red per tick. */
+    private AttributedString animatedGameOverLine(String text, int tick, int w) {
+        if (text.isBlank()) return AttributedString.EMPTY;
+        int pad = Math.max(0, (w - text.length()) / 2);
+        AttributedStringBuilder ab = new AttributedStringBuilder();
+        ab.append(" ".repeat(pad));
+        for (int i = 0; i < text.length(); i++) {
+            boolean bright = ((tick + i) % 3) != 0;
+            AttributedStyle s = bright
+                ? AttributedStyle.DEFAULT.foreground(AttributedStyle.RED).bold()
+                : AttributedStyle.DEFAULT.foreground(AttributedStyle.YELLOW).bold();
+            ab.style(s).append(text.charAt(i));
+        }
+        return ab.toAttributedString();
+    }
+
+    /** Row of alternating star/sparkle chars that shift each tick. */
+    private String starRow(int tick, int len) {
+        char[] chars = {'*', '·', '✦', '·', '*', ' ', '✦', ' '};
+        StringBuilder sb = new StringBuilder();
+        for (int i = 0; i < len; i++) sb.append(chars[(tick + i) % chars.length]);
+        return sb.toString();
+    }
+
+    private String animPlayer(int tick) { return (tick % 4 < 2) ? "@" : "§"; }
+
     private String animCoin(int tick) {
-        String[] frames = {"$", "¢", "o", "¢"};
-        return frames[tick % 4];
+        String[] f = {"$", "¢", "o", "¢"}; return f[tick % 4];
     }
 
     private String animEnemy(String sprite, Enemigo.Estado estado, int tick) {
@@ -297,60 +354,55 @@ public class Renderer {
         return sprite;
     }
 
-    // ── Banner lines ──────────────────────────────────────────────────────────
+    // ── Layout helpers ────────────────────────────────────────────────────────
 
-    private String[] titleBannerLines() {
-        return new String[]{
-            "",
-            "  ██████╗ ██╗   ██╗███╗   ██╗ ██████╗ ███████╗ ██████╗ ███╗   ██╗",
-            "  ██╔══██╗██║   ██║████╗  ██║██╔════╝ ██╔════╝██╔═══██╗████╗  ██║",
-            "  ██║  ██║██║   ██║██╔██╗ ██║██║  ███╗█████╗  ██║   ██║██╔██╗ ██║",
-            "  ██║  ██║██║   ██║██║╚██╗██║██║   ██║██╔══╝  ██║   ██║██║╚██╗██║",
-            "  ██████╔╝╚██████╔╝██║ ╚████║╚██████╔╝███████╗╚██████╔╝██║ ╚████║",
-            "  ╚═════╝  ╚═════╝ ╚═╝  ╚═══╝ ╚═════╝ ╚══════╝ ╚═════╝ ╚═╝  ╚═══╝",
-            "                     C R A W L E R   2 D   v1.2",
-        };
+    /** Full-width horizontal border line. */
+    private AttributedString hline(String l, String mid, String r, int w) {
+        AttributedStringBuilder ab = new AttributedStringBuilder();
+        ab.style(S_BORDER).append(l);
+        for (int i = 0; i < w - 2; i++) ab.append(mid);
+        ab.append(r);
+        return ab.toAttributedString();
     }
 
-    private String[] victoryBannerLines() {
-        return new String[]{
-            "",
-            "  ██╗   ██╗██╗ ██████╗████████╗ ██████╗ ██████╗ ██╗ █████╗ ██╗",
-            "  ██║   ██║██║██╔════╝╚══██╔══╝██╔═══██╗██╔══██╗██║██╔══██╗██║",
-            "  ██║   ██║██║██║        ██║   ██║   ██║██████╔╝██║███████║██║",
-            "  ╚██╗ ██╔╝██║██║        ██║   ██║   ██║██╔══██╗██║██╔══██║╚═╝",
-            "   ╚████╔╝ ██║╚██████╗   ██║   ╚██████╔╝██║  ██║██║██║  ██║██╗",
-            "    ╚═══╝  ╚═╝ ╚═════╝   ╚═╝    ╚═════╝ ╚═╝  ╚═╝╚═╝╚═╝  ╚═╝╚═╝",
-        };
+    /** Centered title inside border. */
+    private AttributedString titleBar(String title, int w) {
+        int inner   = w - 2;
+        int lp      = (inner - title.length()) / 2;
+        int rp      = inner - title.length() - lp;
+        AttributedStringBuilder ab = new AttributedStringBuilder();
+        ab.style(S_BORDER).append("║");
+        ab.style(AttributedStyle.DEFAULT.foreground(AttributedStyle.YELLOW).bold())
+          .append(" ".repeat(lp)).append(title).append(" ".repeat(rp));
+        ab.style(S_BORDER).append("║");
+        return ab.toAttributedString();
     }
 
-    private String[] gameOverBannerLines() {
-        return new String[]{
-            "",
-            "   ██████╗  █████╗ ███╗   ███╗███████╗     ██████╗ ██╗   ██╗███████╗██████╗ ",
-            "  ██╔════╝ ██╔══██╗████╗ ████║██╔════╝    ██╔═══██╗██║   ██║██╔════╝██╔══██╗",
-            "  ██║  ███╗███████║██╔████╔██║█████╗      ██║   ██║██║   ██║█████╗  ██████╔╝",
-            "  ██║   ██║██╔══██║██║╚██╔╝██║██╔══╝      ██║   ██║╚██╗ ██╔╝██╔══╝  ██╔══██╗",
-            "  ╚██████╔╝██║  ██║██║ ╚═╝ ██║███████╗    ╚██████╔╝ ╚████╔╝ ███████╗██║  ██║",
-            "   ╚═════╝ ╚═╝  ╚═╝╚═╝     ╚═╝╚══════╝     ╚═════╝   ╚═══╝  ╚══════╝╚═╝  ╚═╝",
-        };
+    private AttributedString centered(AttributedString s, int w) {
+        // Measure visible length (AttributedString.length() = codepoints, not ANSI)
+        int len = s.toString().length();
+        int pad = Math.max(0, (w - len) / 2);
+        if (pad == 0) return s;
+        AttributedStringBuilder ab = new AttributedStringBuilder();
+        ab.append(" ".repeat(pad));
+        ab.append(s);
+        return ab.toAttributedString();
     }
-
-    // ── Small helpers ─────────────────────────────────────────────────────────
 
     private String hpBar(int hp, int max, int width) {
         int filled = max > 0 ? (int) ((double) hp / max * width) : 0;
         char fill  = hp > max / 2 ? '█' : (hp > max / 4 ? '▓' : '░');
-        return "[" + String.valueOf(fill).repeat(filled) + " ".repeat(width - filled) + "]";
+        return "[" + String.valueOf(fill).repeat(Math.max(0, filled))
+                   + " ".repeat(Math.max(0, width - filled)) + "]";
     }
 
     private String stateTag(MotorJuego motor) {
         switch (motor.getEstado()) {
-            case JUGANDO:   return "▶ JUGANDO ";
-            case PAUSA:     return "⏸ PAUSA   ";
+            case JUGANDO:   return "▶ JUGANDO";
+            case PAUSA:     return "⏸ PAUSA  ";
             case GAME_OVER: return "✖ GAME OVER";
-            case VICTORIA:  return "★ VICTORIA ";
-            default:        return "           ";
+            case VICTORIA:  return "★ VICTORIA";
+            default:        return "         ";
         }
     }
 
@@ -363,16 +415,12 @@ public class Renderer {
     }
 
     private String pad(String s, int width) {
-        return s.length() >= width ? s : s + " ".repeat(width - s.length());
+        if (s.length() >= width) return s.substring(0, width);
+        return s + " ".repeat(width - s.length());
     }
 
     private AttributedString styled(AttributedStyle style, String text) {
         return new AttributedStringBuilder().style(style).append(text).toAttributedString();
-    }
-
-    private AttributedString centeredLine(String text, int width) {
-        int p = Math.max(0, (width - text.length()) / 2);
-        return styled(S_BORDER, " ".repeat(p) + text);
     }
 
     private AttributedString statLine(String label, String value) {
@@ -382,7 +430,34 @@ public class Renderer {
         return ab.toAttributedString();
     }
 
-    private int clamp(int v) {
-        return Math.max(0, Math.min(MAP_SIZE - 1, v));
-    }
+    private int clamp(int v) { return Math.max(0, Math.min(MAP_SIZE - 1, v)); }
+
+    // ── ASCII art (compact, fits in 80 cols) ──────────────────────────────────
+
+    private static final String[] TITLE_LINES = {
+        " ██████╗ ██╗   ██╗███╗   ██╗ ██████╗ ███████╗ ██████╗ ███╗   ██╗",
+        " ██╔══██╗██║   ██║████╗  ██║██╔════╝ ██╔════╝██╔═══██╗████╗  ██║",
+        " ██║  ██║██║   ██║██╔██╗ ██║██║  ███╗█████╗  ██║   ██║██╔██╗ ██║",
+        " ██║  ██║██║   ██║██║╚██╗██║██║   ██║██╔══╝  ██║   ██║██║╚██╗██║",
+        " ██████╔╝╚██████╔╝██║ ╚████║╚██████╔╝███████╗╚██████╔╝██║ ╚████║",
+        " ╚═════╝  ╚═════╝ ╚═╝  ╚═══╝ ╚═════╝ ╚══════╝ ╚═════╝ ╚═╝  ╚═══╝",
+    };
+
+    private static final String[] VICTORY_LINES = {
+        " ██╗   ██╗██╗ ██████╗████████╗ ██████╗ ██████╗ ██╗ █████╗ ██╗",
+        " ██║   ██║██║██╔════╝╚══██╔══╝██╔═══██╗██╔══██╗██║██╔══██╗██║",
+        " ██║   ██║██║██║        ██║   ██║   ██║██████╔╝██║███████║██║",
+        " ╚██╗ ██╔╝██║██║        ██║   ██║   ██║██╔══██╗██║██╔══██║╚═╝",
+        "  ╚████╔╝ ██║╚██████╗   ██║   ╚██████╔╝██║  ██║██║██║  ██║██╗",
+        "   ╚═══╝  ╚═╝ ╚═════╝   ╚═╝    ╚═════╝ ╚═╝  ╚═╝╚═╝╚═╝  ╚═╝╚═╝",
+    };
+
+    private static final String[] GAMEOVER_LINES = {
+        "  ██████╗  █████╗ ███╗   ███╗███████╗     ██████╗ ██╗   ██╗███████╗██████╗",
+        " ██╔════╝ ██╔══██╗████╗ ████║██╔════╝    ██╔═══██╗██║   ██║██╔════╝██╔══██╗",
+        " ██║  ███╗███████║██╔████╔██║█████╗      ██║   ██║██║   ██║█████╗  ██████╔╝",
+        " ██║   ██║██╔══██║██║╚██╔╝██║██╔══╝      ██║   ██║╚██╗ ██╔╝██╔══╝  ██╔══██╗",
+        " ╚██████╔╝██║  ██║██║ ╚═╝ ██║███████╗    ╚██████╔╝ ╚████╔╝ ███████╗██║  ██║",
+        "  ╚═════╝ ╚═╝  ╚═╝╚═╝     ╚═╝╚══════╝     ╚═════╝   ╚═══╝  ╚══════╝╚═╝  ╚═╝",
+    };
 }

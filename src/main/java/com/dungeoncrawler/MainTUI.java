@@ -24,9 +24,8 @@ import java.io.IOException;
  */
 public class MainTUI {
 
-    private static final int FRAME_MS = 300;
+    private static final int FRAME_MS = 200;
 
-    // Synthetic key codes for arrow keys
     private static final int KEY_UP    = 1001;
     private static final int KEY_DOWN  = 1002;
     private static final int KEY_RIGHT = 1003;
@@ -65,14 +64,16 @@ public class MainTUI {
         }
     }
 
-    // ── Menu loop ─────────────────────────────────────────────────────────────
+    // ── Menu loop (animated) ──────────────────────────────────────────────────
 
     private void menuLoop() throws IOException {
+        int animTick = 0;
         while (true) {
-            renderer.renderMenu();
-            int key = readKey();
+            renderer.renderMenu(animTick++);
+            int key = readKeyTimeout(FRAME_MS);
             if (key == '1') {
                 gameLoop();
+                animTick = 0;
             } else if (key == '2' || key == 'q' || key == 'Q') {
                 terminal.writer().println("\n  ¡Hasta luego!");
                 terminal.writer().flush();
@@ -90,34 +91,29 @@ public class MainTUI {
 
         motor.iniciarPartida();
 
-        terminal.writer().print("\033[?25l"); // hide cursor
+        terminal.writer().print("\033[?25l");
         terminal.writer().flush();
 
-        int  animTick   = 0;
-        long lastFrame  = System.currentTimeMillis();
+        int  animTick  = 0;
+        long lastFrame = System.currentTimeMillis();
         boolean running = true;
 
         while (running) {
             MotorJuego.EstadoJuego estado = motor.getEstado();
 
-            // Terminal conditions
             if (estado == MotorJuego.EstadoJuego.VICTORIA) {
-                renderer.renderVictory(motor);
-                waitAnyKey();
+                endScreenLoop(true, motor);
                 running = false;
                 break;
             }
             if (estado == MotorJuego.EstadoJuego.GAME_OVER) {
-                renderer.renderGameOver(motor);
-                waitAnyKey();
+                endScreenLoop(false, motor);
                 running = false;
                 break;
             }
 
-            // Render (pause overlay is handled inside renderGame)
             renderer.renderGame(motor, log, animTick);
 
-            // Read key within remaining frame time
             long elapsed = System.currentTimeMillis() - lastFrame;
             long wait    = Math.max(1L, FRAME_MS - elapsed);
             int key = readKeyTimeout(wait);
@@ -130,7 +126,6 @@ public class MainTUI {
                 handleGameKey(key);
             }
 
-            // Advance frame
             long now = System.currentTimeMillis();
             if (now - lastFrame >= FRAME_MS) {
                 animTick++;
@@ -141,41 +136,46 @@ public class MainTUI {
             }
         }
 
-        terminal.writer().print("\033[?25h"); // restore cursor
+        terminal.writer().print("\033[?25h");
         terminal.writer().flush();
     }
 
-    // ── Key dispatch ─────────────────────────────────────────────────────────
+    // ── Animated end screen loop ──────────────────────────────────────────────
+
+    private void endScreenLoop(boolean victory, MotorJuego motor) throws IOException {
+        int animTick = 0;
+        while (true) {
+            if (victory) renderer.renderVictory(motor, animTick++);
+            else         renderer.renderGameOver(motor, animTick++);
+
+            int key = readKeyTimeout(FRAME_MS);
+            if (key != -1) break;
+        }
+    }
+
+    // ── Key dispatch ──────────────────────────────────────────────────────────
 
     private void handleGameKey(int key) {
         MotorJuego.EstadoJuego estado = motor.getEstado();
-
         switch (key) {
             case 'w': case 'W': case KEY_UP:
-                if (estado == MotorJuego.EstadoJuego.JUGANDO)
-                    gestorInput.desplazarEntidad("ARRIBA");
+                if (estado == MotorJuego.EstadoJuego.JUGANDO) gestorInput.desplazarEntidad("ARRIBA");
                 break;
             case 's': case 'S': case KEY_DOWN:
-                if (estado == MotorJuego.EstadoJuego.JUGANDO)
-                    gestorInput.desplazarEntidad("ABAJO");
+                if (estado == MotorJuego.EstadoJuego.JUGANDO) gestorInput.desplazarEntidad("ABAJO");
                 break;
             case 'a': case 'A': case KEY_LEFT:
-                if (estado == MotorJuego.EstadoJuego.JUGANDO)
-                    gestorInput.desplazarEntidad("IZQUIERDA");
+                if (estado == MotorJuego.EstadoJuego.JUGANDO) gestorInput.desplazarEntidad("IZQUIERDA");
                 break;
             case 'd': case 'D': case KEY_RIGHT:
-                if (estado == MotorJuego.EstadoJuego.JUGANDO)
-                    gestorInput.desplazarEntidad("DERECHA");
+                if (estado == MotorJuego.EstadoJuego.JUGANDO) gestorInput.desplazarEntidad("DERECHA");
                 break;
             case ' ': case 'f': case 'F':
-                if (estado == MotorJuego.EstadoJuego.JUGANDO)
-                    gestorInput.pulsarBotonAccion();
+                if (estado == MotorJuego.EstadoJuego.JUGANDO) gestorInput.pulsarBotonAccion();
                 break;
             case 'p': case 'P':
-                if (estado == MotorJuego.EstadoJuego.JUGANDO)
-                    gestorInput.pausarJuego();
-                else if (estado == MotorJuego.EstadoJuego.PAUSA)
-                    gestorInput.reanudarJuego();
+                if (estado == MotorJuego.EstadoJuego.JUGANDO)      gestorInput.pausarJuego();
+                else if (estado == MotorJuego.EstadoJuego.PAUSA)   gestorInput.reanudarJuego();
                 break;
         }
     }
@@ -183,8 +183,7 @@ public class MainTUI {
     // ── JLine3 key reading ────────────────────────────────────────────────────
 
     private int readKey() throws IOException {
-        int c = terminal.reader().read();
-        return resolveEscape(c);
+        return resolveEscape(terminal.reader().read());
     }
 
     private int readKeyTimeout(long timeoutMs) throws IOException {
@@ -193,7 +192,6 @@ public class MainTUI {
         return resolveEscape(c);
     }
 
-    /** Consume ESC [ A/B/C/D sequences and return synthetic key codes. */
     private int resolveEscape(int first) throws IOException {
         if (first != 27) return first;
         int second = terminal.reader().read(50);
@@ -207,10 +205,5 @@ public class MainTUI {
             }
         }
         return first;
-    }
-
-    private void waitAnyKey() throws IOException {
-        terminal.writer().flush();
-        terminal.reader().read();
     }
 }
