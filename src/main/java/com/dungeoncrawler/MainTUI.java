@@ -105,8 +105,18 @@ public class MainTUI {
         boolean running = true;
 
         while (running) {
-            MotorJuego.EstadoJuego estado = motor.getEstado();
+            // Advance engine tick
+            long now = System.currentTimeMillis();
+            if (now - lastFrame >= FRAME_MS) {
+                animTick++;
+                lastFrame = now;
+                if (motor.getEstado() == MotorJuego.EstadoJuego.JUGANDO) {
+                    motor.actualizar();
+                }
+            }
 
+            // Check terminal conditions AFTER tick, BEFORE render
+            MotorJuego.EstadoJuego estado = motor.getEstado();
             if (estado == MotorJuego.EstadoJuego.VICTORIA) {
                 endScreenLoop(true, motor);
                 running = false;
@@ -131,15 +141,6 @@ public class MainTUI {
                 }
                 handleGameKey(key);
             }
-
-            long now = System.currentTimeMillis();
-            if (now - lastFrame >= FRAME_MS) {
-                animTick++;
-                lastFrame = now;
-                if (motor.getEstado() == MotorJuego.EstadoJuego.JUGANDO) {
-                    motor.actualizar();
-                }
-            }
         }
 
         terminal.writer().print("\033[?25h");
@@ -149,6 +150,7 @@ public class MainTUI {
     // ── Animated end screen loop ──────────────────────────────────────────────
 
     private void endScreenLoop(boolean victory, MotorJuego motor) throws IOException {
+        renderer.clearScreen();
         // Drain any buffered keypress that triggered the end condition
         while (terminal.reader().read(1) != -1) { /* drain */ }
 
