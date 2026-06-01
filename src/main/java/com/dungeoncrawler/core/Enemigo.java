@@ -1,44 +1,47 @@
 package com.dungeoncrawler.core;
 
 /**
- * Clase que representa a un Enemigo en el juego.
- * Hereda de EntidadVideojuego e implementa IA básica con 3 estados:
- * - PATRULLAR: Se mueve aleatoriamente dentro de un área
- * - PERSEGUIR: Sigue al jugador si está en rango de detección
- * - ATACAR: Está adyacente al jugador (simplemente reduce su vida)
- * 
- * AVANZADA 2: Comportamiento NPC del Enemigo.
+ * Representa a un Enemigo con IA básica de tres estados.
+ * AVANZADA 2 (primera parte): Comportamiento NPC del Enemigo.
+ *
+ * Transiciones de estado:
+ *   distancia = 0 o 1  →  ATACAR
+ *   distancia ≤ rango   →  PERSEGUIR
+ *   distancia > rango   →  PATRULLAR
  */
 public class Enemigo extends EntidadVideojuego {
+
     public enum Estado {
         PATRULLAR, PERSEGUIR, ATACAR
     }
 
-    private Estado estado;
-    private int rangoDeteccion;
-    private int danioAtaque;
-    private long ultimoAtaque;
+    private static final int LIMITE_MAPA      = 20;
+    private static final int COOLDOWN_ATAQUE  = 2;  // turnos entre ataques
+
+    private Estado estadoIA;
+    private final int rangoDeteccion;
+    private final int danioAtaque;
+    private int turnoUltimoAtaque;
 
     /**
-     * Constructor de Enemigo.
-     *
-     * @param nombre Identificador del enemigo (ej: "Goblin_1")
-     * @param x Posición inicial X
-     * @param y Posición inicial Y
-     * @param vida Puntos de vida
-     * @param danioAtaque Daño que inflige por ataque
-     * @param rangoDeteccion Distancia a la que detecta al jugador
+     * @param nombre         Identificador (ej: "Goblin_1")
+     * @param x              Posición inicial X
+     * @param y              Posición inicial Y
+     * @param vida           Puntos de vida
+     * @param danioAtaque    Daño infligido por ataque
+     * @param rangoDeteccion Distancia Manhattan máxima para detectar al jugador
      */
-    public Enemigo(String nombre, int x, int y, int vida, int danioAtaque, int rangoDeteccion) {
-        super(nombre, "ENEMIGO", x, y, 1, 1, vida, "goblin_idle");
-        this.estado = Estado.PATRULLAR;
+    public Enemigo(String nombre, int x, int y, int vida,
+                   int danioAtaque, int rangoDeteccion) {
+        super(nombre, "ENEMIGO", x, y, 1, 1, vida, "enemy_idle");
+        this.estadoIA = Estado.PATRULLAR;
         this.danioAtaque = danioAtaque;
         this.rangoDeteccion = rangoDeteccion;
-        this.ultimoAtaque = 0;
+        this.turnoUltimoAtaque = -COOLDOWN_ATAQUE;
     }
 
-    public Estado getEstado() {
-        return estado;
+    public Estado getEstadoIA() {
+        return estadoIA;
     }
 
     public int getRangoDeteccion() {
@@ -49,83 +52,75 @@ public class Enemigo extends EntidadVideojuego {
         return danioAtaque;
     }
 
-    private int distanciaA(int x, int y) {
-        return Math.abs(this.getX() - x) + Math.abs(this.getY() - y);
-    }
-
     @Override
     public void actualizar(MotorJuego motor) {
-        if (!this.estaVivo()) {
-            return;
-        }
+        if (!estaVivo()) return;
 
         Jugador jugador = motor.getJugador();
-        if (jugador == null || !jugador.estaVivo()) {
-            return;
-        }
+        if (jugador == null || !jugador.estaVivo()) return;
 
         int distancia = distanciaA(jugador.getX(), jugador.getY());
+        int tickActual = (int) motor.getTicks();
 
         if (distancia <= 1) {
-            estado = Estado.ATACAR;
-            atacarJugador(jugador);
+            estadoIA = Estado.ATACAR;
+            atacarJugador(jugador, tickActual);
         } else if (distancia <= rangoDeteccion) {
-            estado = Estado.PERSEGUIR;
+            estadoIA = Estado.PERSEGUIR;
             perseguirJugador(jugador);
         } else {
-            estado = Estado.PATRULLAR;
+            estadoIA = Estado.PATRULLAR;
             patrullar();
         }
     }
 
+    // ── Comportamientos ───────────────────────────────────────────────────────
+
     private void patrullar() {
-        int[] direcciones = {-1, 0, 1};
-        int dx = direcciones[(int) (Math.random() * 3)];
-        int dy = direcciones[(int) (Math.random() * 3)];
+        int[] delta = {-1, 0, 1};
+        int dx = delta[(int) (Math.random() * delta.length)];
+        int dy = delta[(int) (Math.random() * delta.length)];
 
-        int nuevoX = Math.max(0, Math.min(20, this.getX() + dx));
-        int nuevoY = Math.max(0, Math.min(20, this.getY() + dy));
+        int nx = Math.max(0, Math.min(LIMITE_MAPA, getX() + dx));
+        int ny = Math.max(0, Math.min(LIMITE_MAPA, getY() + dy));
 
-        this.setX(nuevoX);
-        this.setY(nuevoY);
+        if (nx != getX() || ny != getY()) {
+            setX(nx);
+            setY(ny);
+            System.out.println("[IA] " + getNombre() + " patrulla a (" + nx + "," + ny + ")");
+        }
     }
 
     private void perseguirJugador(Jugador jugador) {
-        int dx = 0;
-        int dy = 0;
+        int dx = Integer.compare(jugador.getX(), getX());
+        int dy = Integer.compare(jugador.getY(), getY());
 
-        if (this.getX() < jugador.getX()) {
-            dx = 1;
-        } else if (this.getX() > jugador.getX()) {
-            dx = -1;
-        }
+        int nx = Math.max(0, Math.min(LIMITE_MAPA, getX() + dx));
+        int ny = Math.max(0, Math.min(LIMITE_MAPA, getY() + dy));
 
-        if (this.getY() < jugador.getY()) {
-            dy = 1;
-        } else if (this.getY() > jugador.getY()) {
-            dy = -1;
-        }
-
-        int nuevoX = Math.max(0, Math.min(20, this.getX() + dx));
-        int nuevoY = Math.max(0, Math.min(20, this.getY() + dy));
-
-        this.setX(nuevoX);
-        this.setY(nuevoY);
+        setX(nx);
+        setY(ny);
+        System.out.println("[IA] " + getNombre() + " persigue al jugador → (" + nx + "," + ny + ")");
     }
 
-    private void atacarJugador(Jugador jugador) {
-        long ahora = System.currentTimeMillis();
-        if (ahora - ultimoAtaque >= 2000) {
+    private void atacarJugador(Jugador jugador, int tickActual) {
+        if (tickActual - turnoUltimoAtaque >= COOLDOWN_ATAQUE) {
             jugador.recibirDanio(danioAtaque);
-            ultimoAtaque = ahora;
-            System.out.println("[LOG] " + this.getNombre() + " ataca a " + jugador.getNombre() 
-                    + " causando " + danioAtaque + " daño. Vida jugador: " + jugador.getVida());
+            turnoUltimoAtaque = tickActual;
+            System.out.println("[IA] " + getNombre() + " ataca a " + jugador.getNombre()
+                    + " (" + danioAtaque + " daño). Vida jugador: " + jugador.getVida());
         }
+    }
+
+    // ── Utilidades ────────────────────────────────────────────────────────────
+
+    private int distanciaA(int tx, int ty) {
+        return Math.abs(getX() - tx) + Math.abs(getY() - ty);
     }
 
     @Override
     public String toString() {
         return super.toString() + String.format(", estado=%s, danio=%d, rango=%d",
-                estado, danioAtaque, rangoDeteccion);
+                estadoIA, danioAtaque, rangoDeteccion);
     }
 }

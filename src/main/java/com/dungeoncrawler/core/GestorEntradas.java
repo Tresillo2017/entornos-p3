@@ -49,8 +49,7 @@ public class GestorEntradas {
 
     /**
      * Procesa un botón de acción (ej: atacar, interactuar).
-     * En este juego, la acción principal es atacar/interactuar con entidades cercanas.
-     * Simula una acción en un rango cercano al jugador.
+     * En este juego, la acción principal es atacar a un enemigo cercano.
      */
     public void pulsarBotonAccion() {
         if (motor.getEstado() != MotorJuego.EstadoJuego.JUGANDO) {
@@ -65,7 +64,7 @@ public class GestorEntradas {
         }
 
         System.out.println("[INPUT] Botón de acción pulsado por " + jugador.getNombre());
-        // La lógica de colisión/interacción se maneja en MotorJuego.procesarColisiones()
+        motor.atacarEnemigoCercano();
     }
 
     /**
