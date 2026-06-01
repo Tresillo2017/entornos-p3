@@ -90,36 +90,135 @@ public class Renderer {
 
     public void renderMenu(int tick) {
         int w = cols();
-        List<AttributedString> lines = new ArrayList<>();
-
-        lines.add(AttributedString.EMPTY);
-        for (String l : TITLE_LINES) {
-            lines.add(animatedTitleLine(l, tick, w));
-        }
-        lines.add(AttributedString.EMPTY);
-
-        // Animated subtitle: blinking cursor
-        String sub = "~ DUNGEON CRAWLER 2D ~" + (tick % 2 == 0 ? "  " : " _");
-        lines.add(centered(styled(S_HINT, sub), w));
-        lines.add(AttributedString.EMPTY);
-
-        // Menu box centered
-        String[] box = {
-            "┌─────────────────────────┐",
-            "│     MENÚ PRINCIPAL      │",
-            "├─────────────────────────┤",
-            "│  [1]  Nueva Partida     │",
-            "│  [2]  Salir             │",
-            "└─────────────────────────┘",
-        };
+        int h = rows();
         AttributedStyle boxStyle = AttributedStyle.DEFAULT
                 .foreground(TITLE_COLOURS[tick % TITLE_COLOURS.length]).bold();
-        for (String l : box) lines.add(centered(styled(boxStyle, l), w));
 
-        lines.add(AttributedString.EMPTY);
-        lines.add(centered(styled(S_HINT, "W/A/S/D · flechas: Mover  │  ESPACIO: Atacar  │  P: Pausa  │  Q: Salir"), w));
+        // ── Content block ─────────────────────────────────────────────────────
+        // Banner (6 lines) + subtitle + empty + box (6 lines) + empty + hint = 16 lines
+        List<String> bannerText = new ArrayList<>();
+        for (String l : TITLE_LINES) bannerText.add(l);
+
+        String sub = "~ DUNGEON CRAWLER 2D ~" + (tick % 2 == 0 ? "  " : " _");
+
+        String[] menuBox = {
+            "╔═══════════════════════════╗",
+            "║      MENÚ PRINCIPAL       ║",
+            "╠═══════════════════════════╣",
+            "║   [1]  Nueva Partida      ║",
+            "║   [2]  Salir              ║",
+            "╚═══════════════════════════╝",
+        };
+        String hint = "W/A/S/D · ↑←↓→ : Mover  │  ESPACIO: Atacar  │  P: Pausa  │  Q: Salir";
+
+        // Right panel content (controls + lore), shown when terminal is wide enough
+        boolean showPanel = w >= 100;
+        String[] panel = {
+            "╔══════════════════════════════╗",
+            "║         CONTROLES            ║",
+            "╠══════════════════════════════╣",
+            "║  W / ↑    Mover arriba       ║",
+            "║  S / ↓    Mover abajo        ║",
+            "║  A / ←    Mover izquierda    ║",
+            "║  D / →    Mover derecha      ║",
+            "║  ESPACIO  Atacar             ║",
+            "║  P        Pausa / Reanudar   ║",
+            "║  Q        Volver al menú     ║",
+            "╠══════════════════════════════╣",
+            "║         OBJETIVO             ║",
+            "╠══════════════════════════════╣",
+            "║  Derrota a todos los         ║",
+            "║  enemigos del mapa para      ║",
+            "║  conseguir la victoria.      ║",
+            "║                              ║",
+            "║  g  Goblin   ~ patrulla      ║",
+            "║  O  Orc      ► persigue      ║",
+            "║  s  Skeleton ⚔ ataca         ║",
+            "║  $  Moneda   +  Poción       ║",
+            "╚══════════════════════════════╝",
+        };
+
+        // Total content height for vertical centering
+        int contentH = 1 + TITLE_LINES.length + 1 + 1 + menuBox.length + 1 + 1;
+        int topPad   = Math.max(1, (h - contentH) / 2);
+
+        List<AttributedString> lines = new ArrayList<>();
+
+        // Top border
+        lines.add(hline("╔", "═", "╗", w));
+
+        // Top padding (inside border)
+        for (int i = 1; i < topPad; i++) lines.add(borderEmpty(w));
+
+        // Animated banner lines — left block + right panel side by side
+        int panelW = showPanel ? panel[0].length() : 0;
+        int bannerAreaW = showPanel ? w - panelW - 4 : w; // 4 = "║ " + " ║" separators
+        for (int i = 0; i < TITLE_LINES.length; i++) {
+            AttributedString bannerLine = animatedTitleLine(TITLE_LINES[i], tick, bannerAreaW);
+            String panelLine = (showPanel && i < panel.length) ? panel[i] : "";
+            lines.add(borderRow(bannerLine, panelLine, w, showPanel, boxStyle));
+        }
+
+        // Subtitle
+        AttributedString subLine = centered(styled(S_HINT, sub), bannerAreaW);
+        String panelSub = showPanel && TITLE_LINES.length < panel.length ? panel[TITLE_LINES.length] : "";
+        lines.add(borderRow(subLine, panelSub, w, showPanel, boxStyle));
+
+        // Empty row
+        String panelEmpty1 = showPanel && TITLE_LINES.length + 1 < panel.length ? panel[TITLE_LINES.length + 1] : "";
+        lines.add(borderRow(AttributedString.EMPTY, panelEmpty1, w, showPanel, boxStyle));
+
+        // Menu box rows
+        for (int i = 0; i < menuBox.length; i++) {
+            AttributedString boxLine = centered(styled(boxStyle, menuBox[i]), bannerAreaW);
+            int pi = TITLE_LINES.length + 2 + i;
+            String panelLine = (showPanel && pi < panel.length) ? panel[pi] : "";
+            lines.add(borderRow(boxLine, panelLine, w, showPanel, boxStyle));
+        }
+
+        // Empty + hint
+        int piHint = TITLE_LINES.length + 2 + menuBox.length;
+        String panelHint = showPanel && piHint < panel.length ? panel[piHint] : "";
+        lines.add(borderRow(AttributedString.EMPTY, panelHint, w, showPanel, boxStyle));
+        piHint++;
+        String panelHint2 = showPanel && piHint < panel.length ? panel[piHint] : "";
+        lines.add(borderRow(centered(styled(S_HINT, hint), bannerAreaW), panelHint2, w, showPanel, boxStyle));
+
+        // Fill remaining rows with border
+        int usedContent = topPad + 1 + TITLE_LINES.length + 1 + 1 + menuBox.length + 1 + 1; // +1 top border
+        while (lines.size() < h - 1) lines.add(borderEmpty(w));
+
+        // Bottom border
+        lines.add(hline("╚", "═", "╝", w));
 
         push(lines);
+    }
+
+    /** One full-width bordered row: left content + optional right panel. */
+    private AttributedString borderRow(AttributedString content, String panelLine,
+                                       int w, boolean showPanel, AttributedStyle panelStyle) {
+        AttributedStringBuilder ab = new AttributedStringBuilder();
+        ab.style(S_BORDER).append("║");
+        ab.append(content);
+        if (showPanel && !panelLine.isEmpty()) {
+            // Fill gap between content and panel
+            int used = 1 + content.columnLength() + 1 + panelLine.length() + 1;
+            int gap  = Math.max(0, w - used);
+            ab.append(" ".repeat(gap));
+            ab.style(panelStyle).append(panelLine);
+        } else {
+            int used = 1 + content.columnLength();
+            ab.append(" ".repeat(Math.max(0, w - used - 1)));
+        }
+        ab.style(S_BORDER).append("║");
+        return ab.toAttributedString();
+    }
+
+    /** Empty bordered row that fills the full width. */
+    private AttributedString borderEmpty(int w) {
+        AttributedStringBuilder ab = new AttributedStringBuilder();
+        ab.style(S_BORDER).append("║").append(" ".repeat(Math.max(0, w - 2))).append("║");
+        return ab.toAttributedString();
     }
 
     // ── Game ──────────────────────────────────────────────────────────────────
