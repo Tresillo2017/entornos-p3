@@ -289,7 +289,17 @@ Detecta en cada tick:
 
 ---
 
-## 7. Compilación y Ejecución
+## 7. Capturas de Pantalla
+
+### Menú Principal
+![Menú principal](ss/main-menu.png)
+
+### Partida en Curso
+![Pantalla de juego](ss/game.png)
+
+---
+
+## 8. Compilación y Ejecución
 
 ### TUI interactiva (recomendado) — requiere Java 11+ y Maven
 
@@ -332,7 +342,7 @@ Detecta en cada tick:
 
 ---
 
-## 8. Bitácora del Uso de Inteligencia Artificial
+## 9. Bitácora del Uso de Inteligencia Artificial
 
 ### Herramienta Utilizada
 **GitHub Copilot** (VS Code) como asistente principal de codificación, con revisiones y correcciones mediante **Claude** (Anthropic).
@@ -403,7 +413,7 @@ con el modelo por turnos del juego.
 
 ---
 
-## 9. Estructura de Directorios
+## 10. Estructura de Directorios
 
 ```
 entornos-p3/
@@ -436,7 +446,7 @@ entornos-p3/
 
 ---
 
-## 10. Historial de Versiones
+## 11. Historial de Versiones
 
 | Versión | Fecha | Cambios |
 |---------|-------|---------|
@@ -447,7 +457,7 @@ entornos-p3/
 
 ---
 
-## 11. Referencias
+## 12. Referencias
 
 - Conventional Commits: https://www.conventionalcommits.org/
 - Java Style Guide: Oracle Docs
