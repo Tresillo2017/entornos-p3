@@ -150,7 +150,6 @@ public class MainTUI {
     // ── Animated end screen loop ──────────────────────────────────────────────
 
     private void endScreenLoop(boolean victory, MotorJuego motor) throws IOException {
-        renderer.clearScreen();
         // Drain any buffered keypress that triggered the end condition
         while (terminal.reader().read(1) != -1) { /* drain */ }
 
