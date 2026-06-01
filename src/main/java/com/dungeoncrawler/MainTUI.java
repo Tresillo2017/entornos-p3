@@ -114,11 +114,8 @@ public class MainTUI {
                 break;
             }
 
-            // Render
+            // Render (pause overlay is handled inside renderGame)
             renderer.renderGame(motor, log, animTick);
-            if (estado == MotorJuego.EstadoJuego.PAUSA) {
-                renderer.renderPaused();
-            }
 
             // Read key within remaining frame time
             long elapsed = System.currentTimeMillis() - lastFrame;
