@@ -1,6 +1,6 @@
 # Dungeon Crawler 2D - Motor de Videojuego
 
-**Versión:** 1.1  
+**Versión:** 1.2  
 **Autor:** Desarrollado con asistencia de IA (GitHub Copilot + Claude)  
 **Fecha:** Junio 2026  
 **Licencia:** MIT  
@@ -9,7 +9,7 @@
 
 ## 1. Descripción del Proyecto
 
-**Dungeon Crawler 2D** es un motor de lógica de videojuego tipo RPG/Dungeon Crawler implementado en Java, sin interfaz gráfica. Simula un aventurero explorando una mazmorra en cuadrícula 2D (20×20) donde debe derrotar enemigos, recolectar items y desbloquear logros.
+**Dungeon Crawler 2D** es un motor de lógica de videojuego tipo RPG/Dungeon Crawler implementado en Java, con **interfaz TUI interactiva** basada en JLine3. Simula un aventurero explorando una mazmorra en cuadrícula 2D (20×20) donde debe derrotar enemigos, recolectar items y desbloquear logros.
 
 ### Temática
 - **Tipo:** RPG / Dungeon Crawler (Grid-based)
@@ -45,7 +45,10 @@
 | `MotorJuego` | Orquestador | Estado del juego, bucle principal, colisiones (AVANZADA 1) |
 | `GestorEntradas` | Servicio input | Traduce comandos de texto en acciones de juego |
 | `SistemaLogros` | Servicio logros | Comprueba y desbloquea logros, premia con XP (AVANZADA 2) |
-| `Main` | Conductor | Bucle de consola, menú y pantalla de fin |
+| `Main` | Conductor | Bucle de consola clásico (sin TUI) |
+| `MainTUI` | Conductor TUI | Bucle de juego JLine3 con raw-mode y animaciones |
+| `Renderer` | Vista TUI | Mapa ASCII, sidebar, menú y pantallas finales con Display |
+| `GameLog` | Utilidad TUI | Buffer circular de mensajes del motor para el sidebar |
 
 > Las clases `Item` y `SistemaLogros` son la clase extra opcional, justificadas porque son imprescindibles para las dos funcionalidades avanzadas elegidas.
 
@@ -288,15 +291,44 @@ Detecta en cada tick:
 
 ## 7. Compilación y Ejecución
 
-```bash
-# Compilar
-javac -d bin src/main/java/com/dungeoncrawler/core/*.java src/main/java/com/dungeoncrawler/*.java
+### TUI interactiva (recomendado) — requiere Java 11+ y Maven
 
-# Ejecutar
-java -cp bin com.dungeoncrawler.Main
+```bash
+# Bash / Git Bash
+./compile.sh          # construye el JAR y lanza la TUI
+
+# PowerShell (Windows)
+.\compile.ps1         # igual
 ```
 
-**Requisitos:** Java 8+. Sin dependencias externas.
+### Versión clásica por consola
+
+```bash
+./compile.sh classic  # compila con javac y lanza Main
+.\compile.ps1 classic # PowerShell
+```
+
+### Suite de tests
+
+```bash
+./compile.sh test
+.\compile.ps1 test
+```
+
+**Requisitos TUI:** Java 11+, Maven 3.9+ (incluido en el repo).  
+**Requisitos clásico:** Java 8+, sin dependencias.
+
+### Controles TUI
+
+| Tecla | Acción |
+|-------|--------|
+| W / ↑ | Mover arriba |
+| S / ↓ | Mover abajo |
+| A / ← | Mover izquierda |
+| D / → | Mover derecha |
+| ESPACIO / F | Atacar |
+| P | Pausar / Reanudar |
+| Q | Menú principal |
 
 ---
 
@@ -377,19 +409,29 @@ con el modelo por turnos del juego.
 entornos-p3/
 ├── README.md
 ├── LICENSE
-├── compile.sh
-├── bin/                    (clases compiladas)
-└── src/main/java/
-    └── com/dungeoncrawler/
-        ├── Main.java
-        └── core/
-            ├── EntidadVideojuego.java
-            ├── Jugador.java
-            ├── Enemigo.java
-            ├── Item.java
-            ├── MotorJuego.java
-            ├── GestorEntradas.java
-            └── SistemaLogros.java
+├── pom.xml                          ← build Maven (JLine3 3.27.1)
+├── compile.sh                       ← launcher Bash
+├── compile.ps1                      ← launcher PowerShell
+├── target/
+│   └── dungeon-crawler-2d-1.2.0.jar ← fat JAR ejecutable
+└── src/
+    ├── main/java/com/dungeoncrawler/
+    │   ├── Main.java                ← entrada clásica
+    │   ├── MainTUI.java             ← entrada TUI (JLine3)
+    │   ├── core/
+    │   │   ├── EntidadVideojuego.java
+    │   │   ├── Jugador.java
+    │   │   ├── Enemigo.java
+    │   │   ├── Item.java
+    │   │   ├── MotorJuego.java
+    │   │   ├── GestorEntradas.java
+    │   │   └── SistemaLogros.java
+    │   └── tui/
+    │       ├── Renderer.java
+    │       ├── GameLog.java
+    │       └── LogInterceptor.java
+    └── test/java/com/dungeoncrawler/
+        └── TestRunner.java
 ```
 
 ---
@@ -404,4 +446,5 @@ entornos-p3/
 ---
 
 **Estado:** Completado  
-**Última actualización:** 1 de junio de 2026
+**Última actualización:** 1 de junio de 2026  
+**Versión actual:** 1.2

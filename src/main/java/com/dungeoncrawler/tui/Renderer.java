@@ -370,11 +370,14 @@ public class Renderer {
         display.update(clamped, -1);
     }
 
-    /** Full redraw: resets Display state so every line is sent regardless of diff. */
+    /** Full redraw: clear screen, reset Display state, then update from (0,0). */
     private void pushForced(List<AttributedString> lines) {
         int c = cols(), r = rows();
-        display.resize(r, c);
         List<AttributedString> clamped = clamp(lines, c, r);
+        // Move cursor to top-left and clear BEFORE reset so Display writes from (0,0)
+        terminal.writer().print("\033[H\033[2J\033[3J");
+        terminal.writer().flush();
+        display.resize(r, c);
         display.reset();
         display.update(clamped, -1);
     }
