@@ -61,7 +61,8 @@ case "$1" in
         echo "Iniciando TUI (JLine3)..."
         java --enable-native-access=ALL-UNNAMED \
              -Dorg.jline.terminal.disableDeprecatedProviderWarning=true \
-             -jar "$JAR"
+             -Dorg.fusesource.jansi.Ansi.disable=false \
+             -jar "$JAR" 2>/dev/null
         ;;
 
     *)

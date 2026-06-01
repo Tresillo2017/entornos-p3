@@ -33,7 +33,7 @@
         </dependency>
         <dependency>
             <groupId>org.jline</groupId>
-            <artifactId>jline-terminal-jni</artifactId>
+            <artifactId>jline-terminal-jansi</artifactId>
             <version>${jline.version}</version>
         </dependency>
     </dependencies>
@@ -64,6 +64,8 @@
                                 <transformer implementation="org.apache.maven.plugins.shade.resource.ManifestResourceTransformer">
                                     <mainClass>com.dungeoncrawler.MainTUI</mainClass>
                                 </transformer>
+                                <!-- Merges META-INF/services/* so JLine3 provider discovery works -->
+                                <transformer implementation="org.apache.maven.plugins.shade.resource.ServicesResourceTransformer"/>
                             </transformers>
                             <filters>
                                 <filter>
