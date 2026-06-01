@@ -149,21 +149,17 @@ public class MainTUI {
     // ── Animated end screen loop ──────────────────────────────────────────────
 
     private void endScreenLoop(boolean victory, MotorJuego motor) throws IOException {
-        renderer.clearScreen();
-        drainInput();
+        // Drain any buffered keypress that triggered the end condition
+        while (terminal.reader().read(1) != -1) { /* drain */ }
+
         int animTick = 0;
         while (true) {
-            if (victory) renderer.renderVictory(motor, animTick++);
-            else         renderer.renderGameOver(motor, animTick++);
+            if (victory) renderer.renderEndScreen(true, motor, animTick++);
+            else         renderer.renderEndScreen(false, motor, animTick++);
 
             int key = readKeyTimeout(FRAME_MS);
             if (key != -1) break;
         }
-    }
-
-    /** Discards any keys already buffered so end screens don't skip instantly. */
-    private void drainInput() throws IOException {
-        while (terminal.reader().read(1) != -1) { /* drain */ }
     }
 
     // ── Key dispatch ──────────────────────────────────────────────────────────

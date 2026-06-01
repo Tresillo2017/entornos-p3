@@ -312,45 +312,58 @@ public class Renderer {
 
     // ── Victory ───────────────────────────────────────────────────────────────
 
-    public void renderVictory(MotorJuego motor, int tick) {
+    public void renderEndScreen(boolean victory, MotorJuego motor, int tick) {
         int w = cols();
-        List<AttributedString> lines = new ArrayList<>();
-        lines.add(AttributedString.EMPTY);
-        for (String l : VICTORY_LINES) lines.add(animTitleCentered(l, tick, w));
-        lines.add(AttributedString.EMPTY);
+        java.io.PrintWriter pw = terminal.writer();
 
-        String stars = starRow(tick, 10);
-        String tag   = stars + "  VICTORIA  " + stars;
-        lines.add(centerInWidth(styled(
-            AttributedStyle.DEFAULT.foreground(TITLE_COLOURS[tick % TITLE_COLOURS.length]).bold(),
-            tag), tag.length(), w));
-        lines.add(AttributedString.EMPTY);
+        // Hard clear
+        pw.print("\033[H\033[2J\033[3J\033[H");
 
-        lines.addAll(endStatLines(motor, w));
-        lines.add(AttributedString.EMPTY);
-        lines.add(centerInWidth(styled(S_HINT, "[ Pulsa cualquier tecla para continuar ]"), 42, w));
-        pushFull(lines);
-    }
+        // Banner
+        String[] bannerLines = victory ? VICTORY_LINES : GAMEOVER_LINES;
+        String bannerColour  = victory ? ansiColour(TITLE_COLOURS[tick % TITLE_COLOURS.length])
+                                       : ((tick % 3 == 0) ? ANSI_YELLOW_BOLD : ANSI_RED_BOLD);
 
-    // ── Game Over ─────────────────────────────────────────────────────────────
+        pw.print("\r\n");
+        for (String l : bannerLines) {
+            pw.print(centeredPlain(bannerColour + l + ANSI_RESET, l.length(), w));
+            pw.print("\r\n");
+        }
+        pw.print("\r\n");
 
-    public void renderGameOver(MotorJuego motor, int tick) {
-        int w = cols();
-        List<AttributedString> lines = new ArrayList<>();
-        lines.add(AttributedString.EMPTY);
-        for (String l : GAMEOVER_LINES) lines.add(animGameOverCentered(l, tick, w));
-        lines.add(AttributedString.EMPTY);
+        // Tag line
+        if (victory) {
+            String stars = starRow(tick, 10);
+            String tag = stars + "  VICTORIA  " + stars;
+            pw.print(centeredPlain(ANSI_YELLOW_BOLD + tag + ANSI_RESET, tag.length(), w));
+        } else {
+            String skull = (tick % 2 == 0) ? "* *  Y O U   D I E D  * *"
+                                           : "    Y O U   D I E D    ";
+            pw.print(centeredPlain(ANSI_RED_BOLD + skull + ANSI_RESET, skull.length(), w));
+        }
+        pw.print("\r\n\r\n");
 
-        String skull = (tick % 2 == 0) ? "* *  Y O U   D I E D  * *" : "    Y O U   D I E D    ";
-        lines.add(centerInWidth(styled(
-            AttributedStyle.DEFAULT.foreground(AttributedStyle.RED).bold(), skull),
-            skull.length(), w));
-        lines.add(AttributedString.EMPTY);
+        // Stats
+        Jugador j = motor.getJugador();
+        printStat(pw, w, "Jugador",     j != null ? j.getNombre() : "?");
+        if (j != null) {
+            printStat(pw, w, "Vida final",  j.getVida() + "/" + j.getVidaMaxima());
+            printStat(pw, w, "Nivel",       String.valueOf(j.getNivel()));
+            printStat(pw, w, "Experiencia", String.valueOf(j.getExperiencia()));
+        }
+        printStat(pw, w, "Puntuacion",  String.valueOf(motor.getPuntuacion()));
+        printStat(pw, w, "Turnos",      String.valueOf(motor.getTicks()));
+        printStat(pw, w, "Enemigos",    motor.getEnemigos().size() + " restantes");
+        if (motor.getSistemaLogros() != null
+                && !motor.getSistemaLogros().getLogrosDesbloqueados().isEmpty()) {
+            printStat(pw, w, "Logros", motor.getSistemaLogros().getLogrosDesbloqueados().toString());
+        }
 
-        lines.addAll(endStatLines(motor, w));
-        lines.add(AttributedString.EMPTY);
-        lines.add(centerInWidth(styled(S_HINT, "[ Pulsa cualquier tecla para continuar ]"), 42, w));
-        pushFull(lines);
+        pw.print("\r\n");
+        String hint = "[ Pulsa cualquier tecla para continuar ]";
+        pw.print(centeredPlain(ANSI_DIM + hint + ANSI_RESET, hint.length(), w));
+        pw.print("\r\n");
+        pw.flush();
     }
 
     // ── Display push ──────────────────────────────────────────────────────────
@@ -363,26 +376,45 @@ public class Renderer {
         display.update(clamped, -1);
     }
 
-    /**
-     * Full direct redraw bypassing Display entirely.
-     * Used for end screens: clears screen, writes every line directly,
-     * then leaves Display in reset state so the next push() or clearScreen()
-     * starts clean without fighting the direct-write cursor position.
-     */
-    private void pushFull(List<AttributedString> lines) {
-        int c = cols(), r = rows();
-        List<AttributedString> clamped = clamp(lines, c, r);
-        // Hard clear + rewrite from top, no Display involvement
-        terminal.writer().print("\033[H\033[2J\033[3J");
-        terminal.writer().print("\033[H");
-        for (int i = 0; i < clamped.size(); i++) {
-            terminal.writer().print(clamped.get(i).toAnsi(terminal));
-            terminal.writer().print("\r\n");
+    // ── Raw ANSI helpers (used by end screens to bypass Display/jansi) ─────────
+
+    private static final String ANSI_RESET       = "\033[0m";
+    private static final String ANSI_BOLD        = "\033[1m";
+    private static final String ANSI_DIM         = "\033[2m";
+    private static final String ANSI_RED_BOLD    = "\033[1;31m";
+    private static final String ANSI_YELLOW_BOLD = "\033[1;33m";
+    private static final String ANSI_CYAN_BOLD   = "\033[1;36m";
+    private static final String ANSI_WHITE_BOLD  = "\033[1;37m";
+    private static final String ANSI_MAGENTA_BOLD= "\033[1;35m";
+
+    private static final String[] ANSI_TITLE_COLOURS = {
+        ANSI_YELLOW_BOLD, ANSI_CYAN_BOLD, ANSI_MAGENTA_BOLD,
+        ANSI_WHITE_BOLD,  ANSI_CYAN_BOLD, ANSI_YELLOW_BOLD,
+    };
+
+    private String ansiColour(int jlineColour) {
+        // Map JLine colour index to raw ANSI string
+        switch (jlineColour) {
+            case AttributedStyle.YELLOW:  return ANSI_YELLOW_BOLD;
+            case AttributedStyle.CYAN:    return ANSI_CYAN_BOLD;
+            case AttributedStyle.MAGENTA: return ANSI_MAGENTA_BOLD;
+            case AttributedStyle.WHITE:   return ANSI_WHITE_BOLD;
+            default:                      return ANSI_BOLD;
         }
-        terminal.writer().flush();
-        // Leave Display reset so it does a full redraw if push() is called next
-        display.resize(r, c);
-        display.reset();
+    }
+
+    /** Returns a string padded so `text` (visually `textLen` chars) is centred in `w`. */
+    private String centeredPlain(String text, int textLen, int w) {
+        int lp = Math.max(0, (w - textLen) / 2);
+        return spaces(lp) + text;
+    }
+
+    private void printStat(java.io.PrintWriter pw, int w, String label, String value) {
+        String line = "  " + ANSI_WHITE_BOLD + label + ": " + ANSI_RESET
+                    + ANSI_CYAN_BOLD + value + ANSI_RESET;
+        int visLen = 2 + label.length() + 2 + value.length();
+        pw.print(centeredPlain(line, visLen, w));
+        pw.print("\r\n");
     }
 
     private List<AttributedString> clamp(List<AttributedString> lines, int c, int r) {
