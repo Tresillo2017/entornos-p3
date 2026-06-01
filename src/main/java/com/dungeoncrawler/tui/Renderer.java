@@ -329,7 +329,7 @@ public class Renderer {
         lines.addAll(endStatLines(motor, w));
         lines.add(AttributedString.EMPTY);
         lines.add(centerInWidth(styled(S_HINT, "[ Pulsa cualquier tecla para continuar ]"), 42, w));
-        push(lines);
+        pushFull(lines);
     }
 
     // ── Game Over ─────────────────────────────────────────────────────────────
@@ -350,26 +350,46 @@ public class Renderer {
         lines.addAll(endStatLines(motor, w));
         lines.add(AttributedString.EMPTY);
         lines.add(centerInWidth(styled(S_HINT, "[ Pulsa cualquier tecla para continuar ]"), 42, w));
-        push(lines);
+        pushFull(lines);
     }
 
     // ── Display push ──────────────────────────────────────────────────────────
 
+    /** Diff-based update used for the game loop (fast, only changed lines). */
     private void push(List<AttributedString> lines) {
         int c = cols(), r = rows();
         display.resize(r, c);
-        // Truncate lines that exceed terminal width to prevent wrapping artifacts
-        List<AttributedString> clamped = new ArrayList<>(lines.size());
-        for (AttributedString l : lines) {
-            if (l.columnLength() > c) {
-                clamped.add(l.columnSubSequence(0, c));
-            } else {
-                clamped.add(l);
-            }
-        }
-        // Pad list to terminal height so Display erases any leftover lines
-        while (clamped.size() < r) clamped.add(AttributedString.EMPTY);
+        List<AttributedString> clamped = clamp(lines, c, r);
         display.update(clamped, -1);
+    }
+
+    /**
+     * Full redraw: ESC[H + print every line directly, then reset Display state.
+     * Used for end screens where display.reset() + diff would show black.
+     */
+    private void pushFull(List<AttributedString> lines) {
+        int c = cols(), r = rows();
+        List<AttributedString> clamped = clamp(lines, c, r);
+        // Move cursor to top-left and rewrite every line
+        terminal.writer().print("\033[H");
+        for (int i = 0; i < clamped.size(); i++) {
+            terminal.writer().print("\033[2K"); // erase current line
+            terminal.writer().print(clamped.get(i).toAnsi(terminal));
+            if (i < clamped.size() - 1) terminal.writer().print("\r\n");
+        }
+        terminal.writer().flush();
+        // Sync Display internal state so the next push() diff is clean
+        display.resize(r, c);
+        display.update(clamped, -1);
+    }
+
+    private List<AttributedString> clamp(List<AttributedString> lines, int c, int r) {
+        List<AttributedString> out = new ArrayList<>(Math.max(lines.size(), r));
+        for (AttributedString l : lines) {
+            out.add(l.columnLength() > c ? l.columnSubSequence(0, c) : l);
+        }
+        while (out.size() < r) out.add(AttributedString.EMPTY);
+        return out;
     }
 
     // ── Sidebar ───────────────────────────────────────────────────────────────
