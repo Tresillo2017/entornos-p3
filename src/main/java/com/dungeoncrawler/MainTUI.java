@@ -150,6 +150,7 @@ public class MainTUI {
 
     private void endScreenLoop(boolean victory, MotorJuego motor) throws IOException {
         renderer.clearScreen();
+        drainInput();
         int animTick = 0;
         while (true) {
             if (victory) renderer.renderVictory(motor, animTick++);
@@ -158,6 +159,11 @@ public class MainTUI {
             int key = readKeyTimeout(FRAME_MS);
             if (key != -1) break;
         }
+    }
+
+    /** Discards any keys already buffered so end screens don't skip instantly. */
+    private void drainInput() throws IOException {
+        while (terminal.reader().read(1) != -1) { /* drain */ }
     }
 
     // ── Key dispatch ──────────────────────────────────────────────────────────
