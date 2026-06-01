@@ -150,8 +150,12 @@ public class MainTUI {
     // ── Animated end screen loop ──────────────────────────────────────────────
 
     private void endScreenLoop(boolean victory, MotorJuego motor) throws IOException {
-        // Drain any buffered keypress that triggered the end condition
-        while (terminal.reader().read(1) != -1) { /* drain */ }
+        // Drain any buffered keypress that triggered the end condition.
+        // read(timeout) returns -2 (READ_EXPIRED) on timeout and -1 (EOF) on close;
+        // both values are < 0, so loop only while a real character is available.
+        while (terminal.reader().read(1) >= 0) { /* drain */ }
+
+        renderer.clearScreen();
 
         int animTick = 0;
         while (true) {
@@ -159,7 +163,7 @@ public class MainTUI {
             else         renderer.renderEndScreen(false, motor, animTick++);
 
             int key = readKeyTimeout(FRAME_MS);
-            if (key != -1) break;
+            if (key >= 0) break;
         }
     }
 

@@ -319,15 +319,17 @@ public class Renderer {
         lines.add(AttributedString.EMPTY);
 
         if (victory) {
-            for (String l : VICTORY_LINES) lines.add(animTitleCentered(l, tick, w));
+            String[] art = artFits(VICTORY_LINES, w) ? VICTORY_LINES : VICTORY_LINES_SMALL;
+            for (String l : art) lines.add(animTitleCentered(l, tick, w));
             lines.add(AttributedString.EMPTY);
-            String stars = starRow(tick, 10);
+            String stars = starRow(tick, Math.min(10, (w - 14) / 2));
             String tag   = stars + "  VICTORIA  " + stars;
             lines.add(centerInWidth(
                 styled(AttributedStyle.DEFAULT.foreground(TITLE_COLOURS[tick % TITLE_COLOURS.length]).bold(), tag),
                 tag.length(), w));
         } else {
-            for (String l : GAMEOVER_LINES) lines.add(animGameOverCentered(l, tick, w));
+            String[] art = artFits(GAMEOVER_LINES, w) ? GAMEOVER_LINES : GAMEOVER_LINES_SMALL;
+            for (String l : art) lines.add(animGameOverCentered(l, tick, w));
             lines.add(AttributedString.EMPTY);
             String skull = (tick % 2 == 0) ? "* *  Y O U   D I E D  * *"
                                            : "    Y O U   D I E D    ";
@@ -339,25 +341,38 @@ public class Renderer {
         lines.add(AttributedString.EMPTY);
 
         Jugador j = motor.getJugador();
-        lines.add(centerInWidth(statLine("Jugador",     j != null ? j.getNombre() : "?"), 30, w));
+        lines.add(centeredStat(statLine("Jugador",     j != null ? j.getNombre() : "?"), w));
         if (j != null) {
-            lines.add(centerInWidth(statLine("Vida final",  j.getVida() + "/" + j.getVidaMaxima()), 20, w));
-            lines.add(centerInWidth(statLine("Nivel",       String.valueOf(j.getNivel())), 15, w));
-            lines.add(centerInWidth(statLine("Experiencia", String.valueOf(j.getExperiencia())), 20, w));
+            lines.add(centeredStat(statLine("Vida final",  j.getVida() + "/" + j.getVidaMaxima()), w));
+            lines.add(centeredStat(statLine("Nivel",       String.valueOf(j.getNivel())), w));
+            lines.add(centeredStat(statLine("Experiencia", String.valueOf(j.getExperiencia())), w));
         }
-        lines.add(centerInWidth(statLine("Puntuacion",  String.valueOf(motor.getPuntuacion())), 20, w));
-        lines.add(centerInWidth(statLine("Turnos",      String.valueOf(motor.getTicks())), 15, w));
-        lines.add(centerInWidth(statLine("Enemigos",    motor.getEnemigos().size() + " restantes"), 25, w));
+        lines.add(centeredStat(statLine("Puntuacion",  String.valueOf(motor.getPuntuacion())), w));
+        lines.add(centeredStat(statLine("Turnos",      String.valueOf(motor.getTicks())), w));
+        lines.add(centeredStat(statLine("Enemigos",    motor.getEnemigos().size() + " restantes"), w));
         if (motor.getSistemaLogros() != null
                 && !motor.getSistemaLogros().getLogrosDesbloqueados().isEmpty()) {
             String ls = motor.getSistemaLogros().getLogrosDesbloqueados().toString();
-            lines.add(centerInWidth(statLine("Logros", ls), 15 + ls.length(), w));
+            lines.add(centeredStat(statLine("Logros", ls), w));
         }
 
         lines.add(AttributedString.EMPTY);
-        lines.add(centerInWidth(styled(S_HINT, "[ Pulsa cualquier tecla para continuar ]"), 42, w));
+        String hint = "[ Pulsa cualquier tecla para continuar ]";
+        lines.add(centerInWidth(styled(S_HINT, hint), hint.length(), w));
 
-        pushForced(lines);
+        push(lines);
+    }
+
+    /** Centers a statLine (plain-text length) within w columns. */
+    private AttributedString centeredStat(AttributedString s, int w) {
+        int textLen = s.toString().length();
+        return centerInWidth(s, textLen, w);
+    }
+
+    /** Returns true if every line in art fits within w columns. */
+    private boolean artFits(String[] art, int w) {
+        for (String l : art) if (l.length() > w) return false;
+        return true;
     }
 
     // ── Display push ──────────────────────────────────────────────────────────
@@ -597,6 +612,10 @@ public class Renderer {
         "   ╚═══╝  ╚═╝ ╚═════╝   ╚═╝    ╚═════╝ ╚═╝  ╚═╝╚═╝╚═╝  ╚═╝╚═╝",
     };
 
+    private static final String[] VICTORY_LINES_SMALL = {
+        " /\\ /\\ /\\  VICTORIA  /\\ /\\ /\\",
+    };
+
     private static final String[] GAMEOVER_LINES = {
         "  ██████╗  █████╗ ███╗   ███╗███████╗     ██████╗ ██╗   ██╗███████╗██████╗",
         " ██╔════╝ ██╔══██╗████╗ ████║██╔════╝    ██╔═══██╗██║   ██║██╔════╝██╔══██╗",
@@ -604,5 +623,9 @@ public class Renderer {
         " ██║   ██║██╔══██║██║╚██╔╝██║██╔══╝      ██║   ██║╚██╗ ██╔╝██╔══╝  ██╔══██╗",
         " ╚██████╔╝██║  ██║██║ ╚═╝ ██║███████╗    ╚██████╔╝ ╚████╔╝ ███████╗██║  ██║",
         "  ╚═════╝ ╚═╝  ╚═╝╚═╝     ╚═╝╚══════╝     ╚═════╝   ╚═══╝  ╚══════╝╚═╝  ╚═╝",
+    };
+
+    private static final String[] GAMEOVER_LINES_SMALL = {
+        " ~~~ GAME OVER ~~~",
     };
 }

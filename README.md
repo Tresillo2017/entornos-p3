@@ -1,6 +1,6 @@
 # Dungeon Crawler 2D - Motor de Videojuego
 
-**Versión:** 1.2  
+**Versión:** 1.3  
 **Autor:** Desarrollado con asistencia de IA (GitHub Copilot + Claude)  
 **Fecha:** Junio 2026  
 **Licencia:** MIT  
@@ -413,7 +413,7 @@ entornos-p3/
 ├── compile.sh                       ← launcher Bash
 ├── compile.ps1                      ← launcher PowerShell
 ├── target/
-│   └── dungeon-crawler-2d-1.2.0.jar ← fat JAR ejecutable
+│   └── dungeon-crawler-2d-1.3.0.jar ← fat JAR ejecutable
 └── src/
     ├── main/java/com/dungeoncrawler/
     │   ├── Main.java                ← entrada clásica
@@ -436,7 +436,18 @@ entornos-p3/
 
 ---
 
-## 10. Referencias
+## 10. Historial de Versiones
+
+| Versión | Fecha | Cambios |
+|---------|-------|---------|
+| 1.3.0 | Jun 2026 | Corrección pantallas finales: fix freeze por `READ_EXPIRED` en drain, salida inmediata sin input y redibujado completo en cada frame. Arte ASCII adaptativo al ancho del terminal; centrado de estadísticas dinámico. |
+| 1.2.0 | Jun 2026 | TUI interactiva con JLine3: mapa ASCII animado, sidebar, pantallas de victoria/game over, menú animado. |
+| 1.1.0 | Jun 2026 | Sistema de logros (`SistemaLogros`), items coleccionables (`Item`), colisiones jugador-item. |
+| 1.0.0 | Jun 2026 | Motor base: `EntidadVideojuego`, `Jugador`, `Enemigo`, `MotorJuego`, `GestorEntradas`. |
+
+---
+
+## 11. Referencias
 
 - Conventional Commits: https://www.conventionalcommits.org/
 - Java Style Guide: Oracle Docs
@@ -447,4 +458,4 @@ entornos-p3/
 
 **Estado:** Completado  
 **Última actualización:** 1 de junio de 2026  
-**Versión actual:** 1.2
+**Versión actual:** 1.3
