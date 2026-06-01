@@ -126,7 +126,7 @@ public abstract class EntidadVideojuego {
      *
      * @return true si vida > 0
      */
-    public boolean estaViva() {
+    public boolean estaVivo() {
         return this.vida > 0;
     }
 

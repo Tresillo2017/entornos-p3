@@ -15,9 +15,9 @@ public class Enemigo extends EntidadVideojuego {
     }
 
     private Estado estado;
-    private int rangoDeteccion; // Distancia Manhattan para activar persecución
+    private int rangoDeteccion;
     private int danioAtaque;
-    private long ultimoAtaque; // Timestamp del último ataque (para cooldown)
+    private long ultimoAtaque;
 
     /**
      * Constructor de Enemigo.
@@ -49,23 +49,13 @@ public class Enemigo extends EntidadVideojuego {
         return danioAtaque;
     }
 
-    /**
-     * Calcula distancia Manhattan entre dos puntos.
-     * Usada para determinar si el jugador está en rango de detección.
-     */
     private int distanciaA(int x, int y) {
         return Math.abs(this.getX() - x) + Math.abs(this.getY() - y);
     }
 
-    /**
-     * Implementa la IA del enemigo.
-     * Actualiza el estado basado en la posición del jugador y ejecuta la acción correspondiente.
-     *
-     * @param motor Referencia al motor para acceder al jugador y al estado del juego
-     */
     @Override
     public void actualizar(MotorJuego motor) {
-        if (!this.estaViva()) {
+        if (!this.estaVivo()) {
             return;
         }
 
@@ -76,25 +66,18 @@ public class Enemigo extends EntidadVideojuego {
 
         int distancia = distanciaA(jugador.getX(), jugador.getY());
 
-        // Máquina de estados: transiciones
         if (distancia <= 1) {
-            // Adyacente: ATACAR
             estado = Estado.ATACAR;
             atacarJugador(jugador);
         } else if (distancia <= rangoDeteccion) {
-            // En rango de detección: PERSEGUIR
             estado = Estado.PERSEGUIR;
             perseguirJugador(jugador);
         } else {
-            // Fuera de rango: PATRULLAR
             estado = Estado.PATRULLAR;
             patrullar();
         }
     }
 
-    /**
-     * Comportamiento PATRULLAR: movimiento aleatorio.
-     */
     private void patrullar() {
         int[] direcciones = {-1, 0, 1};
         int dx = direcciones[(int) (Math.random() * 3)];
@@ -107,10 +90,6 @@ public class Enemigo extends EntidadVideojuego {
         this.setY(nuevoY);
     }
 
-    /**
-     * Comportamiento PERSEGUIR: se acerca al jugador.
-     * Usa lógica simple: se mueve en la dirección que reduce la distancia Manhattan.
-     */
     private void perseguirJugador(Jugador jugador) {
         int dx = 0;
         int dy = 0;
@@ -134,10 +113,6 @@ public class Enemigo extends EntidadVideojuego {
         this.setY(nuevoY);
     }
 
-    /**
-     * Comportamiento ATACAR: inflige daño al jugador.
-     * Implementa un cooldown simple (solo ataca cada 2000ms).
-     */
     private void atacarJugador(Jugador jugador) {
         long ahora = System.currentTimeMillis();
         if (ahora - ultimoAtaque >= 2000) {

@@ -174,7 +174,7 @@ public class MotorJuego {
         procesarColisiones();
 
         // Eliminar entidades muertas
-        enemigos.removeIf(e -> !e.estaViva());
+        enemigos.removeIf(e -> !e.estaVivo());
         items.removeIf(Item::esRecolectado);
 
         // Verificar condiciones de victoria
@@ -200,7 +200,7 @@ public class MotorJuego {
 
         // Colisión con enemigos
         for (Enemigo enemigo : enemigos) {
-            if (!enemigo.estaViva()) continue;
+            if (!enemigo.estaVivo()) continue;
             
             if (enemigo.getX() == jX && enemigo.getY() == jY) {
                 // Colisión directa: el enemigo ya causó daño en su actualización

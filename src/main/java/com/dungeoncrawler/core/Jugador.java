@@ -46,6 +46,14 @@ public class Jugador extends EntidadVideojuego {
     }
 
     /**
+     * Verifica si el jugador está vivo.
+     * @return true si vida > 0
+     */
+    public boolean estaVivo() {
+        return this.getVida() > 0;
+    }
+
+    /**
      * Implementa movimiento del jugador.
      * En el juego real, estos movimientos serían procesados por el InputManager.
      * Para el test, se llama manualmente.
