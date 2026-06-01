@@ -364,23 +364,25 @@ public class Renderer {
     }
 
     /**
-     * Full redraw: ESC[H + print every line directly, then reset Display state.
-     * Used for end screens where display.reset() + diff would show black.
+     * Full direct redraw bypassing Display entirely.
+     * Used for end screens: clears screen, writes every line directly,
+     * then leaves Display in reset state so the next push() or clearScreen()
+     * starts clean without fighting the direct-write cursor position.
      */
     private void pushFull(List<AttributedString> lines) {
         int c = cols(), r = rows();
         List<AttributedString> clamped = clamp(lines, c, r);
-        // Move cursor to top-left and rewrite every line
+        // Hard clear + rewrite from top, no Display involvement
+        terminal.writer().print("\033[H\033[2J\033[3J");
         terminal.writer().print("\033[H");
         for (int i = 0; i < clamped.size(); i++) {
-            terminal.writer().print("\033[2K"); // erase current line
             terminal.writer().print(clamped.get(i).toAnsi(terminal));
-            if (i < clamped.size() - 1) terminal.writer().print("\r\n");
+            terminal.writer().print("\r\n");
         }
         terminal.writer().flush();
-        // Sync Display internal state so the next push() diff is clean
+        // Leave Display reset so it does a full redraw if push() is called next
         display.resize(r, c);
-        display.update(clamped, -1);
+        display.reset();
     }
 
     private List<AttributedString> clamp(List<AttributedString> lines, int c, int r) {
