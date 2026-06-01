@@ -1,36 +1,31 @@
 package com.dungeoncrawler.core;
 
 /**
- * Clase que representa items/objetos recolectables en el juego.
- * Hereda de EntidadVideojuego.
- * Ejemplos: monedas (Coin), pociones de vida (HealthPotion), llaves, etc.
- * 
- * Un item tiene:
- * - Tipo específico (MONEDA, POCION, LLAVE)
- * - Un valor asociado (ej: cantidad de oro, puntos de vida a recuperar)
- * - Estado de "recolectado" (si fue eliminado del mapa)
+ * Representa un item coleccionable en el mapa del juego.
+ * Al ocupar la misma casilla que el jugador, aplica su efecto y desaparece.
+ * Clase extra opcional para la funcionalidad avanzada de colisiones con items.
  */
 public class Item extends EntidadVideojuego {
+
     public enum TipoItem {
-        MONEDA, POCION, LLAVE
+        MONEDA, POCION
     }
 
     private final TipoItem tipoItem;
-    private final int valor; // Para monedas: oro; para pociones: vida recuperada
+    private final int valor;
     private boolean recolectado;
 
     /**
-     * Constructor de Item.
-     *
-     * @param nombre Identificador único (ej: "Moneda_1", "Pocion_Health_5")
-     * @param tipoItem Tipo específico (MONEDA, POCION, LLAVE)
-     * @param x Posición X
-     * @param y Posición Y
-     * @param valor Valor asociado (oro, puntos de vida, etc.)
+     * @param nombre     Identificador del item (ej: "Moneda_1")
+     * @param x          Posición X en el mapa
+     * @param y          Posición Y en el mapa
+     * @param tipo       MONEDA (suma puntos) o POCION (restaura vida)
+     * @param valor      Puntos a sumar o puntos de vida a restaurar
      */
-    public Item(String nombre, TipoItem tipoItem, int x, int y, int valor) {
-        super(nombre, "ITEM", x, y, 1, 1, 1, "item_" + tipoItem.name().toLowerCase());
-        this.tipoItem = tipoItem;
+    public Item(String nombre, int x, int y, TipoItem tipo, int valor) {
+        super(nombre, "ITEM", x, y, 1, 1, 1,
+                tipo == TipoItem.MONEDA ? "coin_sprite" : "potion_sprite");
+        this.tipoItem = tipo;
         this.valor = valor;
         this.recolectado = false;
     }
@@ -43,30 +38,29 @@ public class Item extends EntidadVideojuego {
         return valor;
     }
 
-    public boolean esRecolectado() {
+    public boolean isRecolectado() {
         return recolectado;
     }
 
-    /**
-     * Marca el item como recolectado.
-     * Después de esto, debe ser removido del juego.
-     */
+    /** Marca el item como recogido. Tras esto, estaVivo() retorna false. */
     public void recolectar() {
-        this.recolectado = true;
-        // Items no tienen actualización automática
+        recolectado = true;
     }
 
-    /**
-     * Items no tienen comportamiento autónomo.
-     */
+    /** Un item "muere" al ser recolectado, no cuando su vida llega a 0. */
+    @Override
+    public boolean estaVivo() {
+        return !recolectado;
+    }
+
     @Override
     public void actualizar(MotorJuego motor) {
-        // Sin lógica automática
+        // Los items son pasivos; la recolección ocurre en MotorJuego.procesarColisiones()
     }
 
     @Override
     public String toString() {
-        return String.format("Item[nombre=%s, tipo=%s, pos=(%d,%d), valor=%d, recolectado=%s]",
-                this.getNombre(), tipoItem, this.getX(), this.getY(), valor, recolectado);
+        return super.toString() + String.format(", tipo=%s, valor=%d, recolectado=%b",
+                tipoItem, valor, recolectado);
     }
 }
