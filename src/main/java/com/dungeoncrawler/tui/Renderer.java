@@ -187,7 +187,12 @@ public class Renderer {
 
     /** Hands the full line list to Display; it diffs and only redraws changed lines. */
     private void push(List<AttributedString> lines) {
-        display.update(lines, -1); // -1 = leave cursor at bottom, no input line
+        int cols = terminal.getWidth();
+        int rows = terminal.getHeight();
+        if (cols <= 0) cols = 120;
+        if (rows <= 0) rows = 40;
+        display.resize(rows, cols);
+        display.update(lines, -1);
     }
 
     // ── Line builders ─────────────────────────────────────────────────────────
