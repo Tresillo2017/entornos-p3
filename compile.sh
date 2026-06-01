@@ -59,7 +59,9 @@ case "$1" in
             if [ $? -ne 0 ]; then echo "Error en el build Maven."; exit 1; fi
         fi
         echo "Iniciando TUI (JLine3)..."
-        java -jar "$JAR"
+        java --enable-native-access=ALL-UNNAMED \
+             -Dorg.jline.terminal.disableDeprecatedProviderWarning=true \
+             -jar "$JAR"
         ;;
 
     *)
