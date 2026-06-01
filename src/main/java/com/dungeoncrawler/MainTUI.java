@@ -56,8 +56,10 @@ public class MainTUI {
         System.setOut(new LogInterceptor(System.out, log));
 
         try {
+            renderer.clearScreen();
             menuLoop();
         } finally {
+            renderer.clearScreen();
             terminal.writer().print("\033[?25h");
             terminal.writer().flush();
             terminal.close();
@@ -72,10 +74,13 @@ public class MainTUI {
             renderer.renderMenu(animTick++);
             int key = readKeyTimeout(FRAME_MS);
             if (key == '1') {
+                renderer.clearScreen();
                 gameLoop();
+                renderer.clearScreen();
                 animTick = 0;
             } else if (key == '2' || key == 'q' || key == 'Q') {
-                terminal.writer().println("\n  ¡Hasta luego!");
+                renderer.clearScreen();
+                terminal.writer().println("  ¡Hasta luego!");
                 terminal.writer().flush();
                 return;
             }
@@ -91,6 +96,7 @@ public class MainTUI {
 
         motor.iniciarPartida();
 
+        renderer.clearScreen();
         terminal.writer().print("\033[?25l");
         terminal.writer().flush();
 
@@ -143,6 +149,7 @@ public class MainTUI {
     // ── Animated end screen loop ──────────────────────────────────────────────
 
     private void endScreenLoop(boolean victory, MotorJuego motor) throws IOException {
+        renderer.clearScreen();
         int animTick = 0;
         while (true) {
             if (victory) renderer.renderVictory(motor, animTick++);

@@ -58,13 +58,33 @@ public class Renderer {
     public Renderer(Terminal terminal) {
         this.terminal = terminal;
         this.display  = new Display(terminal, true);
-        this.display.reset();
+    }
+
+    /** Hard-clears the screen and resets the Display diff state. Call on screen transitions. */
+    public void clearScreen() {
+        terminal.writer().print("\033[H\033[2J\033[3J");
+        terminal.writer().flush();
+        display.reset();
     }
 
     // ── Terminal size (with fallback) ─────────────────────────────────────────
 
-    private int cols() { int w = terminal.getWidth();  return w > 0 ? w : FALLBACK_W; }
-    private int rows() { int h = terminal.getHeight(); return h > 0 ? h : FALLBACK_H; }
+    private int cols() {
+        int w = terminal.getWidth();
+        if (w > 0) return w;
+        // PowerShell / ConEmu sometimes expose this via env
+        String c = System.getenv("COLUMNS");
+        if (c != null) { try { return Integer.parseInt(c.trim()); } catch (NumberFormatException ignored) {} }
+        return FALLBACK_W;
+    }
+
+    private int rows() {
+        int h = terminal.getHeight();
+        if (h > 0) return h;
+        String r = System.getenv("LINES");
+        if (r != null) { try { return Integer.parseInt(r.trim()); } catch (NumberFormatException ignored) {} }
+        return FALLBACK_H;
+    }
 
     // ── Menu ──────────────────────────────────────────────────────────────────
 
@@ -98,9 +118,6 @@ public class Renderer {
 
         lines.add(AttributedString.EMPTY);
         lines.add(centered(styled(S_HINT, "W/A/S/D · flechas: Mover  │  ESPACIO: Atacar  │  P: Pausa  │  Q: Salir"), w));
-
-        // Pad to fill terminal height
-        while (lines.size() < rows()) lines.add(AttributedString.EMPTY);
 
         push(lines);
     }
@@ -178,7 +195,6 @@ public class Renderer {
             lines.add(AttributedString.EMPTY);
         }
 
-        while (lines.size() < rows()) lines.add(AttributedString.EMPTY);
         push(lines);
     }
 
@@ -201,7 +217,6 @@ public class Renderer {
         lines.addAll(endStatLines(motor, w));
         lines.add(AttributedString.EMPTY);
         lines.add(centered(styled(S_HINT, "[ Pulsa cualquier tecla para continuar ]"), w));
-        while (lines.size() < rows()) lines.add(AttributedString.EMPTY);
         push(lines);
     }
 
@@ -223,7 +238,6 @@ public class Renderer {
         lines.addAll(endStatLines(motor, w));
         lines.add(AttributedString.EMPTY);
         lines.add(centered(styled(S_HINT, "[ Pulsa cualquier tecla para continuar ]"), w));
-        while (lines.size() < rows()) lines.add(AttributedString.EMPTY);
         push(lines);
     }
 
@@ -232,7 +246,18 @@ public class Renderer {
     private void push(List<AttributedString> lines) {
         int c = cols(), r = rows();
         display.resize(r, c);
-        display.update(lines, -1);
+        // Truncate lines that exceed terminal width to prevent wrapping artifacts
+        List<AttributedString> clamped = new ArrayList<>(lines.size());
+        for (AttributedString l : lines) {
+            if (l.columnLength() > c) {
+                clamped.add(l.columnSubSequence(0, c));
+            } else {
+                clamped.add(l);
+            }
+        }
+        // Pad list to terminal height so Display erases any leftover lines
+        while (clamped.size() < r) clamped.add(AttributedString.EMPTY);
+        display.update(clamped, -1);
     }
 
     // ── Sidebar ───────────────────────────────────────────────────────────────
