@@ -89,135 +89,148 @@ public class Renderer {
     // ── Menu ──────────────────────────────────────────────────────────────────
 
     public void renderMenu(int tick) {
-        int w = cols();
-        int h = rows();
+        int w      = cols();
+        int h      = rows();
+        int innerW = w - 2; // chars between the two ║ border chars
+
         AttributedStyle boxStyle = AttributedStyle.DEFAULT
                 .foreground(TITLE_COLOURS[tick % TITLE_COLOURS.length]).bold();
 
-        // ── Content block ─────────────────────────────────────────────────────
-        // Banner (6 lines) + subtitle + empty + box (6 lines) + empty + hint = 16 lines
-        List<String> bannerText = new ArrayList<>();
-        for (String l : TITLE_LINES) bannerText.add(l);
+        // Right panel (fixed-width plain text), visible when terminal is wide enough.
+        // Each string must be exactly PANEL_W chars wide.
+        final int PANEL_W = 32;
+        String[] panel = {
+            "╔══════════════════════════════╗",
+            "║        CONTROLES             ║",
+            "╠══════════════════════════════╣",
+            "║  W/↑   Mover arriba          ║",
+            "║  S/↓   Mover abajo           ║",
+            "║  A/←   Mover izquierda       ║",
+            "║  D/→   Mover derecha         ║",
+            "║  ESPACIO  Atacar             ║",
+            "║  P     Pausa / Reanudar      ║",
+            "║  Q     Volver al menu        ║",
+            "╠══════════════════════════════╣",
+            "║        ENEMIGOS              ║",
+            "╠══════════════════════════════╣",
+            "║  g  Goblin   ~ patrulla      ║",
+            "║  O  Orc      > persigue      ║",
+            "║  s  Skeleton ! ataca         ║",
+            "╠══════════════════════════════╣",
+            "║        ITEMS                 ║",
+            "╠══════════════════════════════╣",
+            "║  $  Moneda  +5 pts           ║",
+            "║  +  Pocion  +10 vida         ║",
+            "╚══════════════════════════════╝",
+        };
 
-        String sub = "~ DUNGEON CRAWLER 2D ~" + (tick % 2 == 0 ? "  " : " _");
+        boolean showPanel = innerW >= PANEL_W + 40; // need room for banner too
+        // leftW = area available for banner/menu content
+        int leftW = showPanel ? innerW - PANEL_W : innerW;
 
+        // Content rows (banner + menu + hint)
+        String sub = (tick % 2 == 0)
+                ? "~ DUNGEON CRAWLER 2D ~  "
+                : "~ DUNGEON CRAWLER 2D ~ _";
         String[] menuBox = {
             "╔═══════════════════════════╗",
-            "║      MENÚ PRINCIPAL       ║",
+            "║      MENU PRINCIPAL       ║",
             "╠═══════════════════════════╣",
             "║   [1]  Nueva Partida      ║",
             "║   [2]  Salir              ║",
             "╚═══════════════════════════╝",
         };
-        String hint = "W/A/S/D · ↑←↓→ : Mover  │  ESPACIO: Atacar  │  P: Pausa  │  Q: Salir";
+        String hint = "W/A/S/D · flechas: Mover  |  ESPACIO: Atacar  |  P: Pausa  |  Q: Salir";
 
-        // Right panel content (controls + lore), shown when terminal is wide enough
-        boolean showPanel = w >= 100;
-        String[] panel = {
-            "╔══════════════════════════════╗",
-            "║         CONTROLES            ║",
-            "╠══════════════════════════════╣",
-            "║  W / ↑    Mover arriba       ║",
-            "║  S / ↓    Mover abajo        ║",
-            "║  A / ←    Mover izquierda    ║",
-            "║  D / →    Mover derecha      ║",
-            "║  ESPACIO  Atacar             ║",
-            "║  P        Pausa / Reanudar   ║",
-            "║  Q        Volver al menú     ║",
-            "╠══════════════════════════════╣",
-            "║         OBJETIVO             ║",
-            "╠══════════════════════════════╣",
-            "║  Derrota a todos los         ║",
-            "║  enemigos del mapa para      ║",
-            "║  conseguir la victoria.      ║",
-            "║                              ║",
-            "║  g  Goblin   ~ patrulla      ║",
-            "║  O  Orc      ► persigue      ║",
-            "║  s  Skeleton ⚔ ataca         ║",
-            "║  $  Moneda   +  Poción       ║",
-            "╚══════════════════════════════╝",
-        };
+        // Build content rows as AttributedStrings of exactly leftW columns each
+        List<AttributedString> content = new ArrayList<>();
+        for (String bl : TITLE_LINES) content.add(animTitleCentered(bl, tick, leftW));
+        content.add(centerInWidth(styled(S_HINT, sub), sub.length(), leftW));
+        content.add(blankW(leftW));
+        for (String ml : menuBox) content.add(centerInWidth(styled(boxStyle, ml), ml.length(), leftW));
+        content.add(blankW(leftW));
+        content.add(centerInWidth(styled(S_HINT, hint), hint.length(), leftW));
 
-        // Total content height for vertical centering
-        int contentH = 1 + TITLE_LINES.length + 1 + 1 + menuBox.length + 1 + 1;
-        int topPad   = Math.max(1, (h - contentH) / 2);
+        // Vertical centering: pad above and below content
+        int contentH = content.size();
+        int totalInner = h - 2; // rows between top and bottom borders
+        int topPad = Math.max(0, (totalInner - contentH) / 2);
 
         List<AttributedString> lines = new ArrayList<>();
-
-        // Top border
         lines.add(hline("╔", "═", "╗", w));
 
-        // Top padding (inside border)
-        for (int i = 1; i < topPad; i++) lines.add(borderEmpty(w));
-
-        // Animated banner lines — left block + right panel side by side
-        int panelW = showPanel ? panel[0].length() : 0;
-        int bannerAreaW = showPanel ? w - panelW - 4 : w; // 4 = "║ " + " ║" separators
-        for (int i = 0; i < TITLE_LINES.length; i++) {
-            AttributedString bannerLine = animatedTitleLine(TITLE_LINES[i], tick, bannerAreaW);
-            String panelLine = (showPanel && i < panel.length) ? panel[i] : "";
-            lines.add(borderRow(bannerLine, panelLine, w, showPanel, boxStyle));
+        for (int r = 0; r < totalInner; r++) {
+            int ci = r - topPad; // index into content
+            AttributedString left = (ci >= 0 && ci < contentH) ? content.get(ci) : blankW(leftW);
+            String panelLine = (showPanel && r < panel.length) ? panel[r] : spaces(PANEL_W);
+            lines.add(menuRow(left, panelLine, w, showPanel, PANEL_W, boxStyle));
         }
 
-        // Subtitle
-        AttributedString subLine = centered(styled(S_HINT, sub), bannerAreaW);
-        String panelSub = showPanel && TITLE_LINES.length < panel.length ? panel[TITLE_LINES.length] : "";
-        lines.add(borderRow(subLine, panelSub, w, showPanel, boxStyle));
-
-        // Empty row
-        String panelEmpty1 = showPanel && TITLE_LINES.length + 1 < panel.length ? panel[TITLE_LINES.length + 1] : "";
-        lines.add(borderRow(AttributedString.EMPTY, panelEmpty1, w, showPanel, boxStyle));
-
-        // Menu box rows
-        for (int i = 0; i < menuBox.length; i++) {
-            AttributedString boxLine = centered(styled(boxStyle, menuBox[i]), bannerAreaW);
-            int pi = TITLE_LINES.length + 2 + i;
-            String panelLine = (showPanel && pi < panel.length) ? panel[pi] : "";
-            lines.add(borderRow(boxLine, panelLine, w, showPanel, boxStyle));
-        }
-
-        // Empty + hint
-        int piHint = TITLE_LINES.length + 2 + menuBox.length;
-        String panelHint = showPanel && piHint < panel.length ? panel[piHint] : "";
-        lines.add(borderRow(AttributedString.EMPTY, panelHint, w, showPanel, boxStyle));
-        piHint++;
-        String panelHint2 = showPanel && piHint < panel.length ? panel[piHint] : "";
-        lines.add(borderRow(centered(styled(S_HINT, hint), bannerAreaW), panelHint2, w, showPanel, boxStyle));
-
-        // Fill remaining rows with border
-        int usedContent = topPad + 1 + TITLE_LINES.length + 1 + 1 + menuBox.length + 1 + 1; // +1 top border
-        while (lines.size() < h - 1) lines.add(borderEmpty(w));
-
-        // Bottom border
         lines.add(hline("╚", "═", "╝", w));
-
         push(lines);
     }
 
-    /** One full-width bordered row: left content + optional right panel. */
-    private AttributedString borderRow(AttributedString content, String panelLine,
-                                       int w, boolean showPanel, AttributedStyle panelStyle) {
+    /**
+     * Builds one full-width menu row:
+     * ║ [left: exactly leftW cols] [panel: exactly panelW cols if showPanel] ║
+     */
+    private AttributedString menuRow(AttributedString left, String panelLine,
+                                     int w, boolean showPanel, int panelW,
+                                     AttributedStyle panelStyle) {
+        int innerW = w - 2;
         AttributedStringBuilder ab = new AttributedStringBuilder();
         ab.style(S_BORDER).append("║");
-        ab.append(content);
-        if (showPanel && !panelLine.isEmpty()) {
-            // Fill gap between content and panel
-            int used = 1 + content.columnLength() + 1 + panelLine.length() + 1;
-            int gap  = Math.max(0, w - used);
-            ab.append(" ".repeat(gap));
+        ab.append(left); // already exactly leftW cols
+        if (showPanel) {
+            // fill gap between left area and panel (innerW - leftW - panelW spaces)
+            int gap = innerW - left.columnLength() - panelLine.length();
+            if (gap > 0) ab.append(spaces(gap));
             ab.style(panelStyle).append(panelLine);
-        } else {
-            int used = 1 + content.columnLength();
-            ab.append(" ".repeat(Math.max(0, w - used - 1)));
         }
         ab.style(S_BORDER).append("║");
         return ab.toAttributedString();
     }
 
+    /** Animated title line — each char gets a cycling colour, result is exactly areaW cols. */
+    private AttributedString animTitleCentered(String text, int tick, int areaW) {
+        int textLen = text.length(); // box-drawing chars are 1-col wide
+        int lp = Math.max(0, (areaW - textLen) / 2);
+        int rp = Math.max(0, areaW - textLen - lp);
+        AttributedStringBuilder ab = new AttributedStringBuilder();
+        ab.style(AttributedStyle.DEFAULT).append(spaces(lp));
+        for (int i = 0; i < textLen; i++) {
+            int ci = (tick + i) % TITLE_COLOURS.length;
+            ab.style(AttributedStyle.DEFAULT.foreground(TITLE_COLOURS[ci]).bold());
+            ab.append(text.charAt(i));
+        }
+        ab.style(AttributedStyle.DEFAULT).append(spaces(rp));
+        return ab.toAttributedString();
+    }
+
+    /** Centers an already-styled AttributedString inside areaW columns. */
+    private AttributedString centerInWidth(AttributedString s, int textLen, int areaW) {
+        int lp = Math.max(0, (areaW - textLen) / 2);
+        int rp = Math.max(0, areaW - textLen - lp);
+        AttributedStringBuilder ab = new AttributedStringBuilder();
+        ab.append(spaces(lp));
+        ab.append(s);
+        ab.append(spaces(rp));
+        return ab.toAttributedString();
+    }
+
+    /** AttributedString of exactly w spaces. */
+    private AttributedString blankW(int w) {
+        return new AttributedString(spaces(w));
+    }
+
+    private String spaces(int n) {
+        return n > 0 ? " ".repeat(n) : "";
+    }
+
     /** Empty bordered row that fills the full width. */
     private AttributedString borderEmpty(int w) {
         AttributedStringBuilder ab = new AttributedStringBuilder();
-        ab.style(S_BORDER).append("║").append(" ".repeat(Math.max(0, w - 2))).append("║");
+        ab.style(S_BORDER).append("║").append(spaces(Math.max(0, w - 2))).append("║");
         return ab.toAttributedString();
     }
 
@@ -303,19 +316,19 @@ public class Renderer {
         int w = cols();
         List<AttributedString> lines = new ArrayList<>();
         lines.add(AttributedString.EMPTY);
-        for (String l : VICTORY_LINES) lines.add(animatedTitleLine(l, tick, w));
+        for (String l : VICTORY_LINES) lines.add(animTitleCentered(l, tick, w));
         lines.add(AttributedString.EMPTY);
 
-        // Sparkling stars animation around "¡VICTORIA!"
-        String stars = starRow(tick, 20);
-        lines.add(centered(styled(
+        String stars = starRow(tick, 10);
+        String tag   = stars + "  VICTORIA  " + stars;
+        lines.add(centerInWidth(styled(
             AttributedStyle.DEFAULT.foreground(TITLE_COLOURS[tick % TITLE_COLOURS.length]).bold(),
-            stars + "  ¡ V I C T O R I A !  " + stars), w));
+            tag), tag.length(), w));
         lines.add(AttributedString.EMPTY);
 
         lines.addAll(endStatLines(motor, w));
         lines.add(AttributedString.EMPTY);
-        lines.add(centered(styled(S_HINT, "[ Pulsa cualquier tecla para continuar ]"), w));
+        lines.add(centerInWidth(styled(S_HINT, "[ Pulsa cualquier tecla para continuar ]"), 42, w));
         push(lines);
     }
 
@@ -325,18 +338,18 @@ public class Renderer {
         int w = cols();
         List<AttributedString> lines = new ArrayList<>();
         lines.add(AttributedString.EMPTY);
-        for (String l : GAMEOVER_LINES) lines.add(animatedGameOverLine(l, tick, w));
+        for (String l : GAMEOVER_LINES) lines.add(animGameOverCentered(l, tick, w));
         lines.add(AttributedString.EMPTY);
 
-        // Blinking skull
-        String skull = (tick % 2 == 0) ? "💀  Y O U   D I E D  💀" : "   Y O U   D I E D   ";
-        lines.add(centered(styled(
-            AttributedStyle.DEFAULT.foreground(AttributedStyle.RED).bold(), skull), w));
+        String skull = (tick % 2 == 0) ? "* *  Y O U   D I E D  * *" : "    Y O U   D I E D    ";
+        lines.add(centerInWidth(styled(
+            AttributedStyle.DEFAULT.foreground(AttributedStyle.RED).bold(), skull),
+            skull.length(), w));
         lines.add(AttributedString.EMPTY);
 
         lines.addAll(endStatLines(motor, w));
         lines.add(AttributedString.EMPTY);
-        lines.add(centered(styled(S_HINT, "[ Pulsa cualquier tecla para continuar ]"), w));
+        lines.add(centerInWidth(styled(S_HINT, "[ Pulsa cualquier tecla para continuar ]"), 42, w));
         push(lines);
     }
 
@@ -428,26 +441,13 @@ public class Renderer {
 
     // ── Animation helpers ─────────────────────────────────────────────────────
 
-    /** Title line: each character cycles through colours offset by column position. */
-    private AttributedString animatedTitleLine(String text, int tick, int w) {
-        if (text.isBlank()) return AttributedString.EMPTY;
-        int pad = Math.max(0, (w - text.length()) / 2);
+    /** Game-over line: per-char red/yellow sweep, centered in areaW columns. */
+    private AttributedString animGameOverCentered(String text, int tick, int areaW) {
+        if (text.isBlank()) return blankW(areaW);
+        int lp = Math.max(0, (areaW - text.length()) / 2);
+        int rp = Math.max(0, areaW - text.length() - lp);
         AttributedStringBuilder ab = new AttributedStringBuilder();
-        ab.append(" ".repeat(pad));
-        for (int i = 0; i < text.length(); i++) {
-            int colIdx = (tick + i) % TITLE_COLOURS.length;
-            ab.style(AttributedStyle.DEFAULT.foreground(TITLE_COLOURS[colIdx]).bold());
-            ab.append(text.charAt(i));
-        }
-        return ab.toAttributedString();
-    }
-
-    /** Game over line: alternates between red+bold and dark red per tick. */
-    private AttributedString animatedGameOverLine(String text, int tick, int w) {
-        if (text.isBlank()) return AttributedString.EMPTY;
-        int pad = Math.max(0, (w - text.length()) / 2);
-        AttributedStringBuilder ab = new AttributedStringBuilder();
-        ab.append(" ".repeat(pad));
+        ab.style(AttributedStyle.DEFAULT).append(spaces(lp));
         for (int i = 0; i < text.length(); i++) {
             boolean bright = ((tick + i) % 3) != 0;
             AttributedStyle s = bright
@@ -455,6 +455,7 @@ public class Renderer {
                 : AttributedStyle.DEFAULT.foreground(AttributedStyle.YELLOW).bold();
             ab.style(s).append(text.charAt(i));
         }
+        ab.style(AttributedStyle.DEFAULT).append(spaces(rp));
         return ab.toAttributedString();
     }
 
