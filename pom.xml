@@ -16,7 +16,7 @@
         <maven.compiler.source>11</maven.compiler.source>
         <maven.compiler.target>11</maven.compiler.target>
         <project.build.sourceEncoding>UTF-8</project.build.sourceEncoding>
-        <jline.version>3.27.1</jline.version>
+        <jline.version>3.30.15</jline.version>
     </properties>
 
     <dependencies>
